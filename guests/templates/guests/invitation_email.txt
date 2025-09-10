@@ -1,0 +1,23 @@
+Hello {{ invitation.guest.first_name }},
+
+You're invited to {{ invitation.event.name }}!
+
+Event Details:
+Date: {{ invitation.event.date|date:"F d, Y g:i A" }}
+Location: {{ invitation.event.location }}
+
+{% if invitation.event.description %}
+{{ invitation.event.description }}
+{% endif %}
+
+Please RSVP by clicking the link below:
+{{ rsvp_url }}
+
+{% if invitation.event.rsvp_deadline %}
+Please respond by {{ invitation.event.rsvp_deadline|date:"F d, Y" }}.
+{% endif %}
+
+We look forward to seeing you there!
+
+Best regards,
+Event Organizer

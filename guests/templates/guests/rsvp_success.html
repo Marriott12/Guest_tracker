@@ -1,0 +1,62 @@
+{% extends 'guests/base.html' %}
+
+{% block title %}RSVP Confirmed - {{ invitation.event.name }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card rsvp-card text-center">
+            <div class="card-body p-5">
+                <div class="mb-4">
+                    <i class="fas fa-check-circle text-success" style="font-size: 4rem;"></i>
+                </div>
+                
+                <h2 class="text-success mb-3">RSVP Confirmed!</h2>
+                
+                <p class="lead mb-4">
+                    Thank you for responding to our invitation for <strong>{{ invitation.event.name }}</strong>.
+                </p>
+                
+                <div class="alert alert-light">
+                    <h5 class="mb-3">Your Response:</h5>
+                    <p class="mb-2">
+                        <strong>{{ rsvp.get_response_display }}</strong>
+                        {% if rsvp.plus_ones > 0 %}
+                            <br><small>Plus {{ rsvp.plus_ones }} additional guest{{ rsvp.plus_ones|pluralize }}</small>
+                        {% endif %}
+                    </p>
+                    
+                    {% if rsvp.dietary_restrictions %}
+                    <p class="mb-2"><small><strong>Dietary restrictions:</strong> {{ rsvp.dietary_restrictions }}</small></p>
+                    {% endif %}
+                    
+                    {% if rsvp.special_requests %}
+                    <p class="mb-0"><small><strong>Special requests:</strong> {{ rsvp.special_requests }}</small></p>
+                    {% endif %}
+                </div>
+                
+                {% if rsvp.response == 'yes' %}
+                <div class="alert alert-info">
+                    <h6><i class="fas fa-calendar me-2"></i>Event Details</h6>
+                    <p class="mb-1"><strong>Date:</strong> {{ invitation.event.date|date:"F d, Y g:i A" }}</p>
+                    <p class="mb-0"><strong>Location:</strong> {{ invitation.event.location }}</p>
+                </div>
+                
+                <p class="text-muted mt-3">
+                    We look forward to seeing you there! If you need to change your response, 
+                    you can return to this page anytime using the same link.
+                </p>
+                {% elif rsvp.response == 'no' %}
+                <p class="text-muted mt-3">
+                    We're sorry you can't make it, but we understand. Thank you for letting us know!
+                </p>
+                {% else %}
+                <p class="text-muted mt-3">
+                    We hope you can make it! Please let us know your final decision when you can.
+                </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

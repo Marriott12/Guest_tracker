@@ -1,0 +1,266 @@
+{% extends 'guests/base.html' %}
+
+{% block title %}Organizer Dashboard - Guest Tracker{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 class="h3 mb-0">Event Organizer Dashboard</h1>
+                    <p class="text-muted">Welcome back, {{ user.first_name|default:user.username }}!</p>
+                </div>
+                <div>
+                    <a href="/admin/guests/event/add/" class="btn btn-primary">
+                        <i class="fas fa-plus me-1"></i>Create Event
+                    </a>
+                    <a href="/admin/" class="btn btn-outline-secondary ms-2">
+                        <i class="fas fa-cog me-1"></i>Full Admin
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h5 class="card-title">Total Events</h5>
+                            <h2 class="mb-0">{{ total_events }}</h2>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-calendar fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h5 class="card-title">Upcoming</h5>
+                            <h2 class="mb-0">{{ upcoming_events }}</h2>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-clock fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h5 class="card-title">Total Invitations</h5>
+                            <h2 class="mb-0">
+                                {% for event in user_events %}
+                                    {% if forloop.first %}{{ event.total_invitations|default:0 }}{% endif %}
+                                {% empty %}0{% endfor %}
+                            </h2>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-envelope fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h5 class="card-title">Confirmed</h5>
+                            <h2 class="mb-0">
+                                {% for event in user_events %}
+                                    {% if forloop.first %}{{ event.confirmed_guests|default:0 }}{% endif %}
+                                {% empty %}0{% endfor %}
+                            </h2>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-check fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Events List -->
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Your Events</h5>
+                    <a href="/admin/guests/event/" class="btn btn-sm btn-outline-primary">View All</a>
+                </div>
+                <div class="card-body p-0">
+                    {% if user_events %}
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Event Name</th>
+                                        <th>Date</th>
+                                        <th>Location</th>
+                                        <th>Invited</th>
+                                        <th>Confirmed</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for event in user_events %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ event.name }}</strong>
+                                            {% if event.date >= today %}
+                                                <span class="badge bg-success ms-2">Upcoming</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary ms-2">Past</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ event.date|date:"M d, Y" }}</td>
+                                        <td>{{ event.location|truncatechars:30 }}</td>
+                                        <td>
+                                            <span class="badge bg-primary">{{ event.total_invitations }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-success">{{ event.confirmed_guests }}</span>
+                                        </td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <a href="{% url 'event_dashboard' event.id %}" class="btn btn-outline-primary btn-sm">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                <a href="/admin/guests/event/{{ event.id }}/change/" class="btn btn-outline-secondary btn-sm">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-calendar-plus fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No events yet</h5>
+                            <p class="text-muted">Create your first event to get started!</p>
+                            <a href="/admin/guests/event/add/" class="btn btn-primary">
+                                <i class="fas fa-plus me-1"></i>Create Event
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Recent RSVP Activity</h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if recent_rsvps %}
+                        <div class="list-group list-group-flush">
+                            {% for rsvp in recent_rsvps %}
+                            <div class="list-group-item">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h6 class="mb-1">{{ rsvp.invitation.guest.full_name }}</h6>
+                                    <small class="text-muted">{{ rsvp.responded_at|timesince }} ago</small>
+                                </div>
+                                <p class="mb-1">
+                                    <small class="text-muted">{{ rsvp.invitation.event.name }}</small>
+                                </p>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="badge 
+                                        {% if rsvp.response == 'yes' %}bg-success
+                                        {% elif rsvp.response == 'no' %}bg-danger
+                                        {% else %}bg-warning{% endif %}">
+                                        {{ rsvp.get_response_display }}
+                                    </span>
+                                    {% if rsvp.plus_ones %}
+                                        <small class="text-muted">+{{ rsvp.plus_ones }} guest{{ rsvp.plus_ones|pluralize }}</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-inbox fa-2x text-muted mb-2"></i>
+                            <p class="text-muted mb-0">No recent activity</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h5 class="mb-0">Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="/admin/guests/event/add/" class="btn btn-primary">
+                            <i class="fas fa-plus me-1"></i>Create New Event
+                        </a>
+                        <a href="{% url 'add_guest' %}" class="btn btn-outline-primary">
+                            <i class="fas fa-user-plus me-1"></i>Add Guest
+                        </a>
+                        <a href="/admin/guests/guest/" class="btn btn-outline-secondary">
+                            <i class="fas fa-users me-1"></i>Manage Guests
+                        </a>
+                        <a href="{% url 'home' %}" class="btn btn-outline-info">
+                            <i class="fas fa-home me-1"></i>Public View
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.card {
+    border: none;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border-radius: 0.5rem;
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    font-weight: 600;
+}
+
+.table th {
+    font-weight: 600;
+    color: #495057;
+    border-top: none;
+}
+
+.badge {
+    font-size: 0.75em;
+}
+
+.btn-group-sm > .btn {
+    padding: 0.25rem 0.5rem;
+}
+
+.opacity-75 {
+    opacity: 0.75;
+}
+</style>
+{% endblock %}

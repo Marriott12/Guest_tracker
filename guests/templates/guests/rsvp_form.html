@@ -1,0 +1,123 @@
+{% extends 'guests/base.html' %}
+
+{% block title %}RSVP - {{ invitation.event.name }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card rsvp-card">
+            <div class="card-header event-header text-center py-4">
+                <h2 class="mb-2">
+                    <i class="fas fa-envelope-open me-2"></i>
+                    You're Invited!
+                </h2>
+                <h3 class="mb-0">{{ invitation.event.name }}</h3>
+            </div>
+            <div class="card-body p-4">
+                <div class="event-details mb-4">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5><i class="fas fa-calendar me-2 text-primary"></i>Date & Time</h5>
+                            <p class="mb-3">{{ invitation.event.date|date:"F d, Y g:i A" }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h5><i class="fas fa-map-marker-alt me-2 text-primary"></i>Location</h5>
+                            <p class="mb-3">{{ invitation.event.location }}</p>
+                        </div>
+                    </div>
+                    {% if invitation.event.description %}
+                    <h5><i class="fas fa-info-circle me-2 text-primary"></i>Details</h5>
+                    <p class="mb-3">{{ invitation.event.description }}</p>
+                    {% endif %}
+                </div>
+
+                <hr>
+
+                <h4 class="mb-3">Hello {{ invitation.guest.first_name }}!</h4>
+                
+                {% if rsvp.response %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        You previously responded: <strong>{{ rsvp.get_response_display }}</strong>
+                        {% if rsvp.plus_ones > 0 %}
+                            with {{ rsvp.plus_ones }} additional guest{{ rsvp.plus_ones|pluralize }}
+                        {% endif %}
+                        <br><small>You can update your response below.</small>
+                    </div>
+                {% endif %}
+
+                <form method="post" class="needs-validation" novalidate>
+                    {% csrf_token %}
+                    
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">{{ form.response.label }}</label>
+                        <div class="mt-2">
+                            {% for choice in form.response %}
+                                <div class="form-check mb-2">
+                                    {{ choice.tag }}
+                                    <label class="form-check-label ms-2" for="{{ choice.id_for_label }}">
+                                        {{ choice.choice_label }}
+                                    </label>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3" id="plus-ones-section" style="display: none;">
+                        <label for="{{ form.plus_ones.id_for_label }}" class="form-label">
+                            {{ form.plus_ones.label }}
+                        </label>
+                        {{ form.plus_ones }}
+                        <div class="form-text">How many additional guests will you bring?</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="{{ form.dietary_restrictions.id_for_label }}" class="form-label">
+                            {{ form.dietary_restrictions.label }}
+                        </label>
+                        {{ form.dietary_restrictions }}
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="{{ form.special_requests.id_for_label }}" class="form-label">
+                            {{ form.special_requests.label }}
+                        </label>
+                        {{ form.special_requests }}
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-paper-plane me-2"></i>Submit RSVP
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const responseRadios = document.querySelectorAll('input[name="response"]');
+    const plusOnesSection = document.getElementById('plus-ones-section');
+    
+    function togglePlusOnes() {
+        const selectedResponse = document.querySelector('input[name="response"]:checked');
+        if (selectedResponse && selectedResponse.value === 'yes') {
+            plusOnesSection.style.display = 'block';
+        } else {
+            plusOnesSection.style.display = 'none';
+        }
+    }
+    
+    responseRadios.forEach(radio => {
+        radio.addEventListener('change', togglePlusOnes);
+    });
+    
+    // Check initial state
+    togglePlusOnes();
+});
+</script>
+{% endblock %}

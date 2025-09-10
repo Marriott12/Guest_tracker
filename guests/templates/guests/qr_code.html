@@ -1,0 +1,155 @@
+{% extends 'guests/base.html' %}
+
+{% block title %}QR Code - {{ invitation.guest.name }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card qr-card">
+                <div class="card-header text-center bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-qrcode me-2"></i>
+                        Event QR Code
+                    </h4>
+                </div>
+                <div class="card-body text-center p-4">
+                    <!-- Event Information -->
+                    <div class="mb-4">
+                        <h5 class="text-primary">{{ invitation.event.name }}</h5>
+                        <p class="text-muted mb-2">
+                            <i class="fas fa-calendar me-1"></i>
+                            {{ invitation.event.date|date:"F d, Y" }}
+                        </p>
+                        <p class="text-muted mb-2">
+                            <i class="fas fa-clock me-1"></i>
+                            {{ invitation.event.time|time:"g:i A" }}
+                        </p>
+                        {% if invitation.event.location %}
+                        <p class="text-muted mb-3">
+                            <i class="fas fa-map-marker-alt me-1"></i>
+                            {{ invitation.event.location }}
+                        </p>
+                        {% endif %}
+                    </div>
+
+                    <!-- QR Code -->
+                    <div class="qr-code-container mb-4">
+                        {% if invitation.qr_code %}
+                            <img src="{{ invitation.qr_code.url }}" 
+                                 alt="QR Code for {{ invitation.guest.name }}" 
+                                 class="qr-code-image">
+                        {% else %}
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                QR Code not yet generated
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Guest Information -->
+                    <div class="guest-info p-3 bg-light rounded mb-4">
+                        <h6 class="text-secondary mb-2">Guest Information</h6>
+                        <p class="mb-1"><strong>Name:</strong> {{ invitation.guest.name }}</p>
+                        <p class="mb-1"><strong>Email:</strong> {{ invitation.guest.email }}</p>
+                        <p class="mb-0">
+                            <strong>Status:</strong> 
+                            {% if invitation.rsvp_status == 'yes' %}
+                                <span class="badge bg-success">Confirmed</span>
+                            {% elif invitation.rsvp_status == 'no' %}
+                                <span class="badge bg-danger">Declined</span>
+                            {% elif invitation.rsvp_status == 'maybe' %}
+                                <span class="badge bg-warning">Maybe</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Pending</span>
+                            {% endif %}
+                        </p>
+                    </div>
+
+                    <!-- Instructions -->
+                    <div class="instructions">
+                        <h6 class="text-secondary mb-3">Instructions</h6>
+                        <div class="row text-start">
+                            <div class="col-12 mb-2">
+                                <i class="fas fa-mobile-alt text-primary me-2"></i>
+                                <small>Scan this QR code with your phone camera</small>
+                            </div>
+                            <div class="col-12 mb-2">
+                                <i class="fas fa-link text-primary me-2"></i>
+                                <small>Or click the link to access your RSVP</small>
+                            </div>
+                            <div class="col-12 mb-2">
+                                <i class="fas fa-print text-primary me-2"></i>
+                                <small>Print this page for easy access</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="mt-4">
+                        <a href="{% url 'rsvp' invitation.code %}" class="btn btn-primary me-2">
+                            <i class="fas fa-reply me-1"></i>
+                            Update RSVP
+                        </a>
+                        <button onclick="window.print()" class="btn btn-outline-secondary">
+                            <i class="fas fa-print me-1"></i>
+                            Print QR Code
+                        </button>
+                    </div>
+                </div>
+                <div class="card-footer text-center text-muted">
+                    <small>
+                        <i class="fas fa-info-circle me-1"></i>
+                        Keep this QR code safe - it's your ticket to the event!
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.qr-card {
+    border: none;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    border-radius: 15px;
+}
+
+.qr-code-container {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    border: 2px dashed #dee2e6;
+}
+
+.qr-code-image {
+    max-width: 200px;
+    max-height: 200px;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+}
+
+.guest-info {
+    border: 1px solid #e9ecef;
+}
+
+.instructions .col-12 {
+    padding: 8px 0;
+}
+
+@media print {
+    .navbar, .card-footer, .mt-4 {
+        display: none !important;
+    }
+    
+    .container {
+        max-width: 100% !important;
+    }
+    
+    .qr-card {
+        box-shadow: none !important;
+        border: 1px solid #000 !important;
+    }
+}
+</style>
+{% endblock %}

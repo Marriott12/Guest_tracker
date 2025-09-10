@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Invitation to {{ invitation.event.name }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+        .event-details { background: white; padding: 20px; border-radius: 5px; margin: 20px 0; }
+        .cta-button { display: inline-block; background: #007bff; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+        .footer { text-align: center; margin-top: 30px; color: #666; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>You're Invited!</h1>
+            <h2>{{ invitation.event.name }}</h2>
+        </div>
+        
+        <div class="content">
+            <p>Hello {{ invitation.guest.first_name }},</p>
+            
+            <p>We're excited to invite you to <strong>{{ invitation.event.name }}</strong>!</p>
+            
+            <div class="event-details">
+                <h3>Event Details:</h3>
+                <p><strong>📅 Date:</strong> {{ invitation.event.date|date:"F d, Y g:i A" }}</p>
+                <p><strong>📍 Location:</strong> {{ invitation.event.location }}</p>
+                {% if invitation.event.rsvp_deadline %}
+                <p><strong>⏰ RSVP Deadline:</strong> {{ invitation.event.rsvp_deadline|date:"F d, Y" }}</p>
+                {% endif %}
+            </div>
+            
+            {% if invitation.event.description %}
+            <div class="event-details">
+                <h3>About this event:</h3>
+                <p>{{ invitation.event.description }}</p>
+            </div>
+            {% endif %}
+            
+            <div style="text-align: center;">
+                <a href="{{ rsvp_url }}" class="cta-button">RSVP Now</a>
+            </div>
+            
+            <p>Please click the button above to let us know if you can attend. You can also specify any dietary restrictions or special requests.</p>
+            
+            <p>We look forward to celebrating with you!</p>
+            
+            <p>Best regards,<br>Event Organizer</p>
+        </div>
+        
+        <div class="footer">
+            <p>If the button doesn't work, copy and paste this link into your browser:<br>
+            <a href="{{ rsvp_url }}">{{ rsvp_url }}</a></p>
+        </div>
+    </div>
+</body>
+</html>

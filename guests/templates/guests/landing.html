@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Guest Tracker - Professional Event Management{% endblock %}</title>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Bootstrap & Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- AOS Animation Library -->
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #1e40af;
+            --accent-color: #3b82f6;
+            --text-dark: #1f2937;
+            --text-light: #6b7280;
+            --bg-light: #f8fafc;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            line-height: 1.6;
+            color: var(--text-dark);
+            background-color: #ffffff;
+        }
+
+        /* Hero Section */
+        .hero-section {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: white;
+            padding: 100px 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000"><defs><radialGradient id="a" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="%23ffffff" stop-opacity="0.1"/><stop offset="100%" stop-color="%23ffffff" stop-opacity="0"/></radialGradient></defs><circle cx="200" cy="200" r="100" fill="url(%23a)"/><circle cx="800" cy="300" r="150" fill="url(%23a)"/><circle cx="400" cy="700" r="80" fill="url(%23a)"/></svg>');
+            opacity: 0.1;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 2;
+        }
+
+        .hero-title {
+            font-size: 3.5rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            line-height: 1.2;
+        }
+
+        .hero-subtitle {
+            font-size: 1.25rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+            max-width: 600px;
+        }
+
+        .cta-button {
+            background: white;
+            color: var(--primary-color);
+            padding: 15px 30px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.2);
+            color: var(--primary-color);
+        }
+
+        /* Statistics Cards */
+        .stats-section {
+            margin-top: -50px;
+            position: relative;
+            z-index: 3;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 15px;
+            padding: 2rem;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            border: none;
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+
+        .stat-label {
+            color: var(--text-light);
+            font-weight: 500;
+            margin-top: 0.5rem;
+        }
+
+        /* Section Styling */
+        .section-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 3rem;
+            color: var(--text-dark);
+        }
+
+        .section-subtitle {
+            text-align: center;
+            color: var(--text-light);
+            font-size: 1.1rem;
+            margin-bottom: 4rem;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* Event Cards */
+        .event-card {
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 5px 25px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+            border: none;
+            height: 100%;
+        }
+
+        .event-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.15);
+        }
+
+        .event-header {
+            background: linear-gradient(135deg, var(--accent-color) 0%, var(--primary-color) 100%);
+            color: white;
+            padding: 1.5rem;
+            position: relative;
+        }
+
+        .event-date {
+            background: rgba(255,255,255,0.2);
+            padding: 0.5rem 1rem;
+            border-radius: 25px;
+            font-size: 0.9rem;
+            display: inline-block;
+            margin-bottom: 1rem;
+        }
+
+        .event-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .event-location {
+            opacity: 0.9;
+            font-size: 0.95rem;
+        }
+
+        .event-body {
+            padding: 1.5rem;
+        }
+
+        .event-description {
+            color: var(--text-light);
+            margin-bottom: 1.5rem;
+            line-height: 1.6;
+        }
+
+        .event-stats {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 1rem;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .event-stat {
+            text-align: center;
+            flex: 1;
+        }
+
+        .event-stat-number {
+            font-weight: 600;
+            color: var(--primary-color);
+            font-size: 1.1rem;
+        }
+
+        .event-stat-label {
+            font-size: 0.8rem;
+            color: var(--text-light);
+        }
+
+        /* Past Events */
+        .past-event-card {
+            opacity: 0.8;
+        }
+
+        .past-event-header {
+            background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+        }
+
+        /* Navigation */
+        .navbar-brand {
+            font-weight: 700;
+            font-size: 1.5rem;
+        }
+
+        .navbar {
+            background: rgba(255,255,255,0.95) !important;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 20px rgba(0,0,0,0.1);
+        }
+
+        .nav-link {
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        /* Admin Button */
+        .admin-btn {
+            background: var(--primary-color);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .admin-btn:hover {
+            background: var(--secondary-color);
+            color: white;
+            transform: translateY(-1px);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero-title {
+                font-size: 2.5rem;
+            }
+            
+            .hero-subtitle {
+                font-size: 1.1rem;
+            }
+            
+            .section-title {
+                font-size: 2rem;
+            }
+        }
+
+        /* Loading Animation */
+        .fade-in {
+            opacity: 0;
+            animation: fadeIn 0.8s ease forwards;
+        }
+
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-light fixed-top">
+        <div class="container">
+            <a class="navbar-brand text-primary" href="{% url 'home' %}">
+                <i class="fas fa-calendar-check me-2"></i>Guest Tracker
+            </a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto align-items-center">
+                    <li class="nav-item">
+                        <a class="nav-link" href="#upcoming">Upcoming Events</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#past">Past Events</a>
+                    </li>
+                    {% if user.is_authenticated %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'organizer_dashboard' %}">Dashboard</a>
+                    </li>
+                    {% endif %}
+                    <li class="nav-item ms-3">
+                        <a href="/admin/" class="admin-btn">
+                            <i class="fas fa-cog me-1"></i>Admin Panel
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero-section">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-lg-8">
+                    <div class="hero-content" data-aos="fade-up">
+                        <h1 class="hero-title">Professional Event Management</h1>
+                        <p class="hero-subtitle">
+                            Streamline your event planning with our comprehensive guest tracking system. 
+                            Manage invitations, track RSVPs, and create memorable experiences.
+                        </p>
+                        {% if user.is_authenticated %}
+                            <a href="{% url 'organizer_dashboard' %}" class="cta-button">
+                                <i class="fas fa-tachometer-alt me-2"></i>Go to Dashboard
+                            </a>
+                        {% else %}
+                            <a href="/admin/login/" class="cta-button">
+                                <i class="fas fa-rocket me-2"></i>Get Started
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Statistics Section -->
+    <section class="stats-section">
+        <div class="container">
+            <div class="row g-4" data-aos="fade-up" data-aos-delay="200">
+                <div class="col-md-3 col-sm-6">
+                    <div class="card stat-card">
+                        <div class="stat-number">{{ stats.total_events }}</div>
+                        <div class="stat-label">Total Events</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="card stat-card">
+                        <div class="stat-number">{{ stats.upcoming_count }}</div>
+                        <div class="stat-label">Upcoming Events</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="card stat-card">
+                        <div class="stat-number">{{ stats.total_guests }}</div>
+                        <div class="stat-label">Registered Guests</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="card stat-card">
+                        <div class="stat-number">{{ stats.total_rsvps }}</div>
+                        <div class="stat-label">RSVP Responses</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Upcoming Events Section -->
+    <section id="upcoming" class="py-5 mt-5">
+        <div class="container">
+            <h2 class="section-title" data-aos="fade-up">Upcoming Events</h2>
+            <p class="section-subtitle" data-aos="fade-up" data-aos-delay="100">
+                Join us for these exciting upcoming events and experiences
+            </p>
+            
+            {% if upcoming_events %}
+                <div class="row g-4">
+                    {% for event in upcoming_events %}
+                        <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="{{ forloop.counter|add:100 }}">
+                            <div class="card event-card">
+                                <div class="event-header">
+                                    <div class="event-date">
+                                        <i class="fas fa-calendar me-1"></i>
+                                        {{ event.date|date:"M d, Y" }}
+                                    </div>
+                                    <h3 class="event-title">{{ event.name }}</h3>
+                                    <div class="event-location">
+                                        <i class="fas fa-map-marker-alt me-1"></i>
+                                        {{ event.location }}
+                                    </div>
+                                </div>
+                                <div class="event-body">
+                                    <p class="event-description">
+                                        {{ event.description|truncatewords:20 }}
+                                    </p>
+                                    <div class="event-stats">
+                                        <div class="event-stat">
+                                            <div class="event-stat-number">{{ event.total_invitations }}</div>
+                                            <div class="event-stat-label">Invited</div>
+                                        </div>
+                                        <div class="event-stat">
+                                            <div class="event-stat-number">{{ event.confirmed_guests }}</div>
+                                            <div class="event-stat-label">Confirmed</div>
+                                        </div>
+                                        {% if event.max_guests %}
+                                        <div class="event-stat">
+                                            <div class="event-stat-number">{{ event.max_guests }}</div>
+                                            <div class="event-stat-label">Max Capacity</div>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center py-5" data-aos="fade-up">
+                    <i class="fas fa-calendar-plus fa-4x text-muted mb-3"></i>
+                    <h4 class="text-muted">No upcoming events</h4>
+                    <p class="text-muted">Check back soon for new events!</p>
+                </div>
+            {% endif %}
+        </div>
+    </section>
+
+    <!-- Past Events Section -->
+    {% if past_events %}
+    <section id="past" class="py-5 bg-light">
+        <div class="container">
+            <h2 class="section-title" data-aos="fade-up">Past Events</h2>
+            <p class="section-subtitle" data-aos="fade-up" data-aos-delay="100">
+                Take a look at our successful past events and celebrations
+            </p>
+            
+            <div class="row g-4">
+                {% for event in past_events %}
+                    <div class="col-lg-3 col-md-6" data-aos="fade-up" data-aos-delay="{{ forloop.counter|add:100 }}">
+                        <div class="card event-card past-event-card">
+                            <div class="event-header past-event-header">
+                                <div class="event-date">
+                                    <i class="fas fa-calendar me-1"></i>
+                                    {{ event.date|date:"M d, Y" }}
+                                </div>
+                                <h3 class="event-title">{{ event.name }}</h3>
+                                <div class="event-location">
+                                    <i class="fas fa-map-marker-alt me-1"></i>
+                                    {{ event.location }}
+                                </div>
+                            </div>
+                            <div class="event-body">
+                                <div class="event-stats">
+                                    <div class="event-stat">
+                                        <div class="event-stat-number">{{ event.total_invitations }}</div>
+                                        <div class="event-stat-label">Invited</div>
+                                    </div>
+                                    <div class="event-stat">
+                                        <div class="event-stat-number">{{ event.confirmed_guests }}</div>
+                                        <div class="event-stat-label">Attended</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- Footer -->
+    <footer class="bg-dark text-white py-4 mt-5">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <p class="mb-0">&copy; 2025 Guest Tracker. Professional Event Management Solution.</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <a href="/admin/" class="text-white me-3">
+                        <i class="fas fa-cog me-1"></i>Admin Panel
+                    </a>
+                    <a href="#" class="text-white">
+                        <i class="fas fa-question-circle me-1"></i>Support
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script>
+        // Initialize AOS animations
+        AOS.init({
+            duration: 800,
+            easing: 'ease-in-out',
+            once: true
+        });
+
+        // Smooth scrolling for navigation links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+
+        // Add fade-in class to elements on scroll
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('fade-in');
+                }
+            });
+        }, observerOptions);
+
+        // Observe all cards
+        document.querySelectorAll('.event-card, .stat-card').forEach(card => {
+            observer.observe(card);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,130 @@
+{% extends 'guests/base.html' %}
+
+{% block title %}Analytics Dashboard - Guest Tracker{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">
+                        <i class="fas fa-chart-line me-2 text-primary"></i>
+                        Analytics Dashboard
+                    </h1>
+                    <p class="text-muted">Comprehensive insights into your event performance</p>
+                </div>
+                <div>
+                    <span class="badge bg-warning">Coming Soon</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Basic Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-lg-4 col-md-6 mb-3">
+            <div class="card metric-card bg-primary text-white">
+                <div class="card-body text-center">
+                    <i class="fas fa-calendar fa-2x mb-2"></i>
+                    <h3 class="mb-0">{{ total_events }}</h3>
+                    <small>Total Events</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4 col-md-6 mb-3">
+            <div class="card metric-card bg-info text-white">
+                <div class="card-body text-center">
+                    <i class="fas fa-users fa-2x mb-2"></i>
+                    <h3 class="mb-0">{{ total_guests }}</h3>
+                    <small>Total Guests</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4 col-md-6 mb-3">
+            <div class="card metric-card bg-warning text-white">
+                <div class="card-body text-center">
+                    <i class="fas fa-envelope fa-2x mb-2"></i>
+                    <h3 class="mb-0">{{ total_invitations }}</h3>
+                    <small>Invitations</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Coming Soon Section -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <i class="fas fa-chart-pie fa-4x text-muted mb-4"></i>
+                    <h4 class="text-muted mb-3">Advanced Analytics Coming Soon!</h4>
+                    <p class="text-muted mb-4">
+                        We're working on bringing you comprehensive analytics including:
+                    </p>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <div class="feature-item">
+                                <i class="fas fa-chart-bar text-primary me-2"></i>
+                                Interactive Charts & Graphs
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="feature-item">
+                                <i class="fas fa-clock text-success me-2"></i>
+                                Response Time Analysis
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="feature-item">
+                                <i class="fas fa-percentage text-info me-2"></i>
+                                RSVP Rate Tracking
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="feature-item">
+                                <i class="fas fa-calendar-check text-warning me-2"></i>
+                                Event Performance Metrics
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <a href="{% url 'organizer_dashboard' %}" class="btn btn-primary me-2">
+                            <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
+                        </a>
+                        <a href="{% url 'home' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-home me-1"></i>Home
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.metric-card {
+    border: none;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    transition: transform 0.2s;
+}
+
+.metric-card:hover {
+    transform: translateY(-2px);
+}
+
+.card {
+    border: none;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.feature-item {
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 5px;
+    margin-bottom: 10px;
+}
+</style>
+{% endblock %}
