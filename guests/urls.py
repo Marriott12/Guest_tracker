@@ -23,4 +23,7 @@ urlpatterns = [
     
     # Guest management URLs
     path('add-guest/', views.add_guest, name='add_guest'),
+
+    # Past events page
+    path('past-events/', views.past_events, name='past_events'),
 ]

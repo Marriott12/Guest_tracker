@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Guest Tracker - Professional Event Management{% endblock %}</title>
+    <title>{% block title %}Zambia Army Guest Tracking System - Professional Event Management{% endblock %}</title>
     
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -333,28 +333,19 @@
     </nav>
 
     <!-- Hero Section -->
-    <section class="hero-section">
+    <section class="hero-section text-center">
         <div class="container">
-            <div class="row align-items-center">
-                <div class="col-lg-8">
-                    <div class="hero-content" data-aos="fade-up">
-                        <h1 class="hero-title">Professional Event Management</h1>
-                        <p class="hero-subtitle">
-                            Streamline your event planning with our comprehensive guest tracking system. 
-                            Manage invitations, track RSVPs, and create memorable experiences.
-                        </p>
-                        {% if user.is_authenticated %}
-                            <a href="{% url 'organizer_dashboard' %}" class="cta-button">
-                                <i class="fas fa-tachometer-alt me-2"></i>Go to Dashboard
-                            </a>
-                        {% else %}
-                            <a href="/admin/login/" class="cta-button">
-                                <i class="fas fa-rocket me-2"></i>Get Started
-                            </a>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
+            <h1 class="display-3 fw-bold mb-3" data-aos="fade-up">Zambia Army Guest Tracking System</h1>
+            <p class="lead mb-4" data-aos="fade-up" data-aos-delay="100">A world-class platform for managing military events, tracking RSVPs, and organizing guest lists with security and efficiency.</p>
+            {% if user.is_authenticated %}
+                <a href="{% url 'organizer_dashboard' %}" class="cta-button">
+                    <i class="fas fa-tachometer-alt me-2"></i>Go to Dashboard
+                </a>
+            {% else %}
+                <a href="/admin/login/" class="cta-button">
+                    <i class="fas fa-rocket me-2"></i>Get Started
+                </a>
+            {% endif %}
         </div>
     </section>
 

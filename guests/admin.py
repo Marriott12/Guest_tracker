@@ -6,6 +6,11 @@ from .models import (
     GuestProfile, EventAnalytics, EmailTemplate, EventWaitlist
 )
 
+# Set custom admin site headers/titles directly
+admin.site.site_header = "Zambia Army Guest Tracking System Administration"
+admin.site.site_title = "Zambia Army Guest Tracking System Admin"
+admin.site.index_title = "Welcome to Zambia Army Guest Tracking System Administration"
+
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):
     list_display = ['name', 'date', 'location', 'created_by', 'invitation_count', 'rsvp_count']
@@ -56,7 +61,8 @@ class InvitationAdmin(admin.ModelAdmin):
 
 @admin.register(RSVP)
 class RSVPAdmin(admin.ModelAdmin):
-    list_display = ['guest_name', 'event_name', 'response', 'plus_ones', 'total_guests', 'responded_at']
+    list_display = ['guest_name', 'event_name', 'response', 'plus_ones', 'total_guests', 'responded_at'
+]
     list_filter = ['response', 'invitation__event', 'responded_at']
     search_fields = ['invitation__guest__first_name', 'invitation__guest__last_name']
     readonly_fields = ['responded_at', 'updated_at']

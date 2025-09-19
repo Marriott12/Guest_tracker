@@ -1,0 +1,27 @@
+{% extends 'guests/base.html' %}
+{% block title %}Past Events{% endblock %}
+{% block content %}
+<div class="container mt-5">
+    <h2 class="mb-4">Past Events</h2>
+    {% if past_events %}
+        <div class="row">
+            {% for event in past_events %}
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ event.name }}</h5>
+                        <p class="card-text">{{ event.description|default:"No description." }}</p>
+                        <p class="card-text"><strong>Date:</strong> {{ event.date|date:"M d, Y H:i" }}</p>
+                        <p class="card-text"><strong>Location:</strong> {{ event.location }}</p>
+                        <p class="card-text"><strong>Confirmed Guests:</strong> {{ event.confirmed_guests }}</p>
+                        <a href="{% url 'event_dashboard' event.id %}" class="btn btn-primary btn-sm">View Dashboard</a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="alert alert-info">No past events found.</div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -250,3 +250,17 @@ def analytics_placeholder(request):
         'total_guests': Guest.objects.count(),
         'total_invitations': Invitation.objects.count(),
     })
+
+def past_events(request):
+    """Show all past events"""
+    from django.db.models import Count, Q
+    from .models import Event
+    from django.utils import timezone
+    past_events = Event.objects.filter(date__lt=timezone.now()).annotate(
+        total_invitations=Count('invitations'),
+        confirmed_guests=Count(
+            'invitations__rsvp',
+            filter=Q(invitations__rsvp__response='yes')
+        )
+    ).order_by('-date')
+    return render(request, 'guests/past_events.html', {'past_events': past_events})

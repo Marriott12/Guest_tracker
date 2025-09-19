@@ -1,189 +1,198 @@
 {% extends 'guests/base.html' %}
 
-{% block title %}{{ event.name }} - Dashboard{% endblock %}
+{% block title %}Event Dashboard - Zambia Army Guest Tracking System{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h1><i class="fas fa-calendar-check me-2"></i>{{ event.name }}</h1>
-    <div>
-        <a href="{% url 'send_invitations' event.id %}" class="btn btn-primary">
-            <i class="fas fa-envelope me-2"></i>Send Invitations
-        </a>
-        <a href="{% url 'add_guest_to_event' event.id %}" class="btn btn-success">
-            <i class="fas fa-user-plus me-2"></i>Add Guest
-        </a>
-    </div>
-</div>
-
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card bg-primary text-white">
-            <div class="card-body text-center">
-                <h3>{{ stats.total_invitations }}</h3>
-                <p class="mb-0">Total Invitations</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card bg-success text-white">
-            <div class="card-body text-center">
-                <h3>{{ stats.rsvp_yes }}</h3>
-                <p class="mb-0">Yes Responses</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card bg-danger text-white">
-            <div class="card-body text-center">
-                <h3>{{ stats.rsvp_no }}</h3>
-                <p class="mb-0">No Responses</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card bg-warning text-white">
-            <div class="card-body text-center">
-                <h3>{{ stats.no_response }}</h3>
-                <p class="mb-0">No Response</p>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row mb-4">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5><i class="fas fa-chart-pie me-2"></i>Response Summary</h5>
-            </div>
-            <div class="card-body">
-                <div class="mb-2 d-flex justify-content-between">
-                    <span>Expected Guests:</span>
-                    <strong class="text-success">{{ stats.total_expected_guests }}</strong>
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 class="h3 mb-0">Zambia Army Guest Tracking System - Event Dashboard</h1>
+                    <p class="text-muted">Manage your event details, guests, and invitations here.</p>
                 </div>
-                <div class="mb-2 d-flex justify-content-between">
-                    <span>Maybe Responses:</span>
-                    <span class="text-warning">{{ stats.rsvp_maybe }}</span>
+                <div>
+                    <a href="{% url 'send_invitations' event.id %}" class="btn btn-primary">
+                        <i class="fas fa-envelope me-2"></i>Send Invitations
+                    </a>
+                    <a href="{% url 'add_guest_to_event' event.id %}" class="btn btn-success">
+                        <i class="fas fa-user-plus me-2"></i>Add Guest
+                    </a>
                 </div>
-                <div class="progress" style="height: 25px;">
-                    <div class="progress-bar bg-success" style="width: {{ stats.rsvp_yes|floatformat:0 }}%">
-                        Yes
+            </div>
+
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body text-center">
+                            <h3>{{ stats.total_invitations }}</h3>
+                            <p class="mb-0">Total Invitations</p>
+                        </div>
                     </div>
-                    <div class="progress-bar bg-warning" style="width: {{ stats.rsvp_maybe|floatformat:0 }}%">
-                        Maybe
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body text-center">
+                            <h3>{{ stats.rsvp_yes }}</h3>
+                            <p class="mb-0">Yes Responses</p>
+                        </div>
                     </div>
-                    <div class="progress-bar bg-danger" style="width: {{ stats.rsvp_no|floatformat:0 }}%">
-                        No
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-danger text-white">
+                        <div class="card-body text-center">
+                            <h3>{{ stats.rsvp_no }}</h3>
+                            <p class="mb-0">No Responses</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-white">
+                        <div class="card-body text-center">
+                            <h3>{{ stats.no_response }}</h3>
+                            <p class="mb-0">No Response</p>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5><i class="fas fa-info-circle me-2"></i>Event Details</h5>
-            </div>
-            <div class="card-body">
-                <p><strong>Date:</strong> {{ event.date|date:"F d, Y g:i A" }}</p>
-                <p><strong>Location:</strong> {{ event.location }}</p>
-                {% if event.rsvp_deadline %}
-                <p><strong>RSVP Deadline:</strong> {{ event.rsvp_deadline|date:"F d, Y g:i A" }}</p>
-                {% endif %}
-                {% if event.max_guests %}
-                <p><strong>Max Guests:</strong> {{ event.max_guests }}</p>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
 
-<div class="card">
-    <div class="card-header">
-        <h5><i class="fas fa-users me-2"></i>Guest List</h5>
-    </div>
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-hover">
-                <thead>
-                    <tr>
-                        <th>Guest</th>
-                        <th>Email</th>
-                        <th>Invitation Status</th>
-                        <th>RSVP Status</th>
-                        <th>Plus Ones</th>
-                        <th>Response Date</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for invitation in invitations %}
-                    <tr>
-                        <td>{{ invitation.guest.full_name }}</td>
-                        <td>{{ invitation.guest.email }}</td>
-                        <td>
-                            {% if invitation.email_sent %}
-                                <span class="badge bg-success">
-                                    <i class="fas fa-check me-1"></i>Sent
-                                </span>
-                            {% else %}
-                                <span class="badge bg-warning">
-                                    <i class="fas fa-clock me-1"></i>Pending
-                                </span>
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-chart-pie me-2"></i>Response Summary</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-2 d-flex justify-content-between">
+                                <span>Expected Guests:</span>
+                                <strong class="text-success">{{ stats.total_expected_guests }}</strong>
+                            </div>
+                            <div class="mb-2 d-flex justify-content-between">
+                                <span>Maybe Responses:</span>
+                                <span class="text-warning">{{ stats.rsvp_maybe }}</span>
+                            </div>
+                            <div class="progress" style="height: 25px;">
+                                <div class="progress-bar bg-success" style="width: {{ stats.rsvp_yes|floatformat:0 }}%">
+                                    Yes
+                                </div>
+                                <div class="progress-bar bg-warning" style="width: {{ stats.rsvp_maybe|floatformat:0 }}%">
+                                    Maybe
+                                </div>
+                                <div class="progress-bar bg-danger" style="width: {{ stats.rsvp_no|floatformat:0 }}%">
+                                    No
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-info-circle me-2"></i>Event Details</h5>
+                        </div>
+                        <div class="card-body">
+                            <p><strong>Date:</strong> {{ event.date|date:"F d, Y g:i A" }}</p>
+                            <p><strong>Location:</strong> {{ event.location }}</p>
+                            {% if event.rsvp_deadline %}
+                            <p><strong>RSVP Deadline:</strong> {{ event.rsvp_deadline|date:"F d, Y g:i A" }}</p>
                             {% endif %}
-                        </td>
-                        <td>
-                            {% if invitation.rsvp %}
-                                {% if invitation.rsvp.response == 'yes' %}
-                                    <span class="badge bg-success">
-                                        <i class="fas fa-check me-1"></i>Yes
-                                    </span>
-                                {% elif invitation.rsvp.response == 'no' %}
-                                    <span class="badge bg-danger">
-                                        <i class="fas fa-times me-1"></i>No
-                                    </span>
-                                {% else %}
-                                    <span class="badge bg-warning">
-                                        <i class="fas fa-question me-1"></i>Maybe
-                                    </span>
-                                {% endif %}
-                            {% else %}
-                                <span class="badge bg-secondary">
-                                    <i class="fas fa-hourglass-half me-1"></i>No Response
-                                </span>
+                            {% if event.max_guests %}
+                            <p><strong>Max Guests:</strong> {{ event.max_guests }}</p>
                             {% endif %}
-                        </td>
-                        <td>
-                            {% if invitation.rsvp and invitation.rsvp.response == 'yes' %}
-                                {{ invitation.rsvp.plus_ones|default:0 }}
-                            {% else %}
-                                -
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if invitation.rsvp %}
-                                {{ invitation.rsvp.responded_at|date:"M d, Y" }}
-                            {% else %}
-                                -
-                            {% endif %}
-                        </td>
-                        <td>
-                            <a href="{% url 'rsvp' invitation.unique_code %}" 
-                               class="btn btn-sm btn-outline-primary" 
-                               target="_blank">
-                                <i class="fas fa-external-link-alt"></i>
-                            </a>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="7" class="text-center text-muted">
-                            No guests invited yet. <a href="{% url 'add_guest_to_event' event.id %}">Add your first guest!</a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-users me-2"></i>Guest List</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Guest</th>
+                                    <th>Email</th>
+                                    <th>Invitation Status</th>
+                                    <th>RSVP Status</th>
+                                    <th>Plus Ones</th>
+                                    <th>Response Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for invitation in invitations %}
+                                <tr>
+                                    <td>{{ invitation.guest.full_name }}</td>
+                                    <td>{{ invitation.guest.email }}</td>
+                                    <td>
+                                        {% if invitation.email_sent %}
+                                            <span class="badge bg-success">
+                                                <i class="fas fa-check me-1"></i>Sent
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-warning">
+                                                <i class="fas fa-clock me-1"></i>Pending
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if invitation.rsvp %}
+                                            {% if invitation.rsvp.response == 'yes' %}
+                                                <span class="badge bg-success">
+                                                    <i class="fas fa-check me-1"></i>Yes
+                                                </span>
+                                            {% elif invitation.rsvp.response == 'no' %}
+                                                <span class="badge bg-danger">
+                                                    <i class="fas fa-times me-1"></i>No
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-warning">
+                                                    <i class="fas fa-question me-1"></i>Maybe
+                                                </span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="badge bg-secondary">
+                                                <i class="fas fa-hourglass-half me-1"></i>No Response
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if invitation.rsvp and invitation.rsvp.response == 'yes' %}
+                                            {{ invitation.rsvp.plus_ones|default:0 }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if invitation.rsvp %}
+                                            {{ invitation.rsvp.responded_at|date:"M d, Y" }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="{% url 'rsvp' invitation.unique_code %}" 
+                                           class="btn btn-sm btn-outline-primary" 
+                                           target="_blank">
+                                            <i class="fas fa-external-link-alt"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="7" class="text-center text-muted">
+                                        No guests invited yet. <a href="{% url 'add_guest_to_event' event.id %}">Add your first guest!</a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
