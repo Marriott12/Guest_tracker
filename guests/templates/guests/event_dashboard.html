@@ -224,9 +224,22 @@
                                     <td>
                                         <a href="{% url 'rsvp' invitation.unique_code %}" 
                                            class="btn btn-sm btn-outline-primary" 
-                                           target="_blank">
+                                           target="_blank"
+                                           title="View RSVP Form">
                                             <i class="fas fa-external-link-alt"></i>
                                         </a>
+                                        {% if invitation.email_sent %}
+                                        <form method="post" action="{% url 'resend_invitation' invitation.id %}" style="display: inline;">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="next" value="{% url 'event_dashboard' event.id %}">
+                                            <button type="submit" 
+                                                    class="btn btn-sm btn-outline-success" 
+                                                    title="Resend Invitation"
+                                                    onclick="return confirm('Resend invitation to {{ invitation.guest.full_name }}?');">
+                                                <i class="fas fa-redo"></i>
+                                            </button>
+                                        </form>
+                                        {% endif %}
                                     </td>
                                 </tr>
                                 {% empty %}

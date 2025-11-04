@@ -21,6 +21,9 @@ urlpatterns = [
     path('event/<int:event_id>/send-invitations/', views.send_invitations, name='send_invitations'),
     path('event/<int:event_id>/add-guest/', views.add_guest, name='add_guest_to_event'),
     
+    # Invitation management
+    path('invitation/<int:invitation_id>/resend/', views.resend_invitation, name='resend_invitation'),
+    
     # Guest management URLs
     path('add-guest/', views.add_guest, name='add_guest'),
 

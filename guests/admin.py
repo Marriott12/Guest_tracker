@@ -64,6 +64,28 @@ class InvitationAdmin(admin.ModelAdmin):
     list_filter = ['event', 'email_sent', 'sent_at', 'checked_in']
     search_fields = ['guest__first_name', 'guest__last_name', 'guest__email', 'barcode_number']
     readonly_fields = ['unique_code', 'sent_at', 'rsvp_link', 'barcode_number', 'barcode_display', 'qr_display', 'check_in_time']
+    actions = ['resend_invitations_action']
+    
+    def resend_invitations_action(self, request, queryset):
+        """Admin action to resend selected invitations"""
+        from django.utils import timezone
+        from guests.views import send_invitation_email
+        
+        sent_count = 0
+        for invitation in queryset:
+            try:
+                send_invitation_email(invitation, request)
+                invitation.email_sent = True
+                invitation.email_sent_at = timezone.now()
+                invitation.status = 'sent'
+                invitation.save(update_fields=['email_sent', 'email_sent_at', 'status'])
+                sent_count += 1
+            except Exception as e:
+                self.message_user(request, f'Error sending to {invitation.guest.full_name}: {str(e)}', level='ERROR')
+        
+        self.message_user(request, f'Successfully resent {sent_count} invitation(s)!')
+    
+    resend_invitations_action.short_description = "Resend selected invitations"
     
     def rsvp_status(self, obj):
         if hasattr(obj, 'rsvp'):

@@ -147,20 +147,27 @@ def send_invitations(request, event_id):
     
     if request.method == 'POST':
         invitation_ids = request.POST.getlist('invitation_ids')
+        resend = request.POST.get('resend', 'false') == 'true'
         sent_count = 0
         
         for invitation_id in invitation_ids:
             try:
                 invitation = Invitation.objects.get(id=invitation_id, event=event)
-                if not invitation.email_sent:
+                # Send if not sent before OR if explicitly resending
+                if not invitation.email_sent or resend:
                     send_invitation_email(invitation, request)
                     invitation.email_sent = True
-                    invitation.save()
+                    invitation.email_sent_at = timezone.now()
+                    invitation.status = 'sent'
+                    invitation.save(update_fields=['email_sent', 'email_sent_at', 'status'])
                     sent_count += 1
             except Invitation.DoesNotExist:
                 continue
         
-        messages.success(request, f'Successfully sent {sent_count} invitations!')
+        if resend:
+            messages.success(request, f'Successfully resent {sent_count} invitation(s)!')
+        else:
+            messages.success(request, f'Successfully sent {sent_count} invitation(s)!')
         return redirect('event_dashboard', event_id=event.id)
     
     # Get invitations that haven't been sent yet
@@ -323,3 +330,30 @@ def guest_info(request, code):
         'invitation': invitation,
         'rsvp': rsvp
     })
+
+@login_required
+def resend_invitation(request, invitation_id):
+    """Resend a single invitation email"""
+    invitation = get_object_or_404(Invitation, id=invitation_id)
+    
+    # Check if user has permission
+    if invitation.event.created_by != request.user:
+        messages.error(request, 'You do not have permission to resend this invitation.')
+        return redirect('organizer_dashboard')
+    
+    if request.method == 'POST':
+        send_invitation_email(invitation, request)
+        invitation.email_sent = True
+        invitation.email_sent_at = timezone.now()
+        invitation.status = 'sent'
+        invitation.save(update_fields=['email_sent', 'email_sent_at', 'status'])
+        
+        messages.success(request, f'Invitation resent to {invitation.guest.full_name}!')
+        
+        # Redirect back to event dashboard or referrer
+        next_url = request.POST.get('next', None)
+        if next_url:
+            return redirect(next_url)
+        return redirect('event_dashboard', event_id=invitation.event.id)
+    
+    return redirect('event_dashboard', event_id=invitation.event.id)

@@ -251,6 +251,17 @@
                             <a href="{% url 'organizer_dashboard' %}" class="btn btn-outline-secondary">
                                 <i class="fas fa-home me-1"></i>Back to Dashboard
                             </a>
+                            
+                            <!-- Resend Invitation Button -->
+                            <form method="post" action="{% url 'resend_invitation' invitation.id %}" style="display: inline;">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="{% url 'guest_info' invitation.unique_code %}">
+                                <button type="submit" 
+                                        class="btn btn-outline-success" 
+                                        onclick="return confirm('Resend invitation email to {{ invitation.guest.full_name }}?');">
+                                    <i class="fas fa-envelope me-1"></i>Resend Invitation
+                                </button>
+                            </form>
                         </div>
                     </div>
                 </div>
