@@ -50,6 +50,25 @@ class Event(models.Model):
     rsvp_deadline = models.DateTimeField(null=True, blank=True)
     max_guests = models.IntegerField(null=True, blank=True, help_text="Maximum number of guests allowed")
     
+    # Event Details
+    dress_code = models.CharField(max_length=200, blank=True, help_text="e.g., Formal, Casual, Military Uniform")
+    parking_info = models.TextField(blank=True, help_text="Parking instructions and availability")
+    special_instructions = models.TextField(blank=True, help_text="Any special instructions for guests")
+    
+    # Program Schedule
+    program_schedule = models.JSONField(default=dict, blank=True, help_text="Event program/agenda as JSON")
+    
+    # Menu Information
+    menu = models.JSONField(default=dict, blank=True, help_text="Event menu details as JSON")
+    
+    # Contact Information
+    contact_person = models.CharField(max_length=200, blank=True)
+    contact_phone = models.CharField(max_length=20, blank=True)
+    contact_email = models.EmailField(blank=True)
+    
+    # Event Image/Banner
+    event_banner = models.ImageField(upload_to='event_banners/', blank=True, null=True)
+    
     def __str__(self):
         return self.name
     

@@ -17,6 +17,31 @@ class EventAdmin(admin.ModelAdmin):
     list_filter = ['date', 'created_by']
     search_fields = ['name', 'location']
     readonly_fields = ['created_at']
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('name', 'description', 'date', 'location', 'created_by', 'event_banner')
+        }),
+        ('RSVP Settings', {
+            'fields': ('rsvp_deadline', 'max_guests')
+        }),
+        ('Event Details', {
+            'fields': ('dress_code', 'parking_info', 'special_instructions'),
+            'classes': ('collapse',)
+        }),
+        ('Program & Menu', {
+            'fields': ('program_schedule', 'menu'),
+            'classes': ('collapse',),
+            'description': 'Enter as JSON format. Example for program: {"items": [{"time": "10:00 AM", "activity": "Opening Ceremony", "description": "Welcome speech"}]}'
+        }),
+        ('Contact Information', {
+            'fields': ('contact_person', 'contact_phone', 'contact_email'),
+            'classes': ('collapse',)
+        }),
+        ('Metadata', {
+            'fields': ('created_at',),
+            'classes': ('collapse',)
+        }),
+    )
     
     def invitation_count(self, obj):
         return obj.invitations.count()

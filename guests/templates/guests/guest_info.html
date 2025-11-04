@@ -49,6 +49,19 @@
                             <p><strong>Location:</strong><br>
                                 {{ invitation.event.location }}
                             </p>
+                            {% if invitation.event.dress_code %}
+                            <p><strong>Dress Code:</strong><br>
+                                {{ invitation.event.dress_code }}
+                            </p>
+                            {% endif %}
+                            {% if invitation.event.contact_person %}
+                            <p><strong>Contact Person:</strong><br>
+                                {{ invitation.event.contact_person }}
+                                {% if invitation.event.contact_phone %}
+                                    <br><a href="tel:{{ invitation.event.contact_phone }}">{{ invitation.event.contact_phone }}</a>
+                                {% endif %}
+                            </p>
+                            {% endif %}
                             <p><strong>Invitation Code:</strong><br>
                                 <code>{{ invitation.unique_code }}</code>
                             </p>
@@ -57,6 +70,83 @@
                             </p>
                         </div>
                     </div>
+
+                    <!-- Event Details Section -->
+                    {% if invitation.event.program_schedule or invitation.event.menu or invitation.event.parking_info or invitation.event.special_instructions %}
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="border-bottom pb-2 mb-3">Event Details</h5>
+                        </div>
+                        
+                        {% if invitation.event.program_schedule %}
+                        <div class="col-md-6 mb-3">
+                            <div class="card">
+                                <div class="card-header bg-info text-white">
+                                    <h6 class="mb-0"><i class="fas fa-clock me-2"></i>Program Schedule</h6>
+                                </div>
+                                <div class="card-body">
+                                    <ul class="list-unstyled mb-0">
+                                        {% for item in invitation.event.program_schedule.items %}
+                                            <li class="mb-2">
+                                                <strong>{{ item.time }}</strong> - {{ item.activity }}
+                                                {% if item.description %}
+                                                    <br><small class="text-muted">{{ item.description }}</small>
+                                                {% endif %}
+                                            </li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if invitation.event.menu %}
+                        <div class="col-md-6 mb-3">
+                            <div class="card">
+                                <div class="card-header bg-success text-white">
+                                    <h6 class="mb-0"><i class="fas fa-utensils me-2"></i>Menu</h6>
+                                </div>
+                                <div class="card-body">
+                                    {% for category, items in invitation.event.menu.items %}
+                                        <h6 class="text-capitalize">{{ category }}</h6>
+                                        <ul class="mb-3">
+                                            {% for item in items %}
+                                                <li>{{ item }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if invitation.event.parking_info %}
+                        <div class="col-md-6 mb-3">
+                            <div class="card">
+                                <div class="card-header bg-warning text-dark">
+                                    <h6 class="mb-0"><i class="fas fa-parking me-2"></i>Parking Information</h6>
+                                </div>
+                                <div class="card-body">
+                                    {{ invitation.event.parking_info|linebreaks }}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if invitation.event.special_instructions %}
+                        <div class="col-md-6 mb-3">
+                            <div class="card">
+                                <div class="card-header bg-primary text-white">
+                                    <h6 class="mb-0"><i class="fas fa-info-circle me-2"></i>Special Instructions</h6>
+                                </div>
+                                <div class="card-body">
+                                    {{ invitation.event.special_instructions|linebreaks }}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
 
                     <!-- RSVP Details -->
                     <div class="row mb-4">

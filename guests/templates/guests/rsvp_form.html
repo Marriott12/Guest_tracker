@@ -25,9 +25,85 @@
                             <p class="mb-3">{{ invitation.event.location }}</p>
                         </div>
                     </div>
+                    
+                    {% if invitation.event.dress_code %}
+                    <div class="row">
+                        <div class="col-md-12">
+                            <h5><i class="fas fa-tshirt me-2 text-primary"></i>Dress Code</h5>
+                            <p class="mb-3">{{ invitation.event.dress_code }}</p>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
                     {% if invitation.event.description %}
                     <h5><i class="fas fa-info-circle me-2 text-primary"></i>Details</h5>
                     <p class="mb-3">{{ invitation.event.description }}</p>
+                    {% endif %}
+                    
+                    <!-- Collapsible Event Details -->
+                    {% if invitation.event.program_schedule or invitation.event.menu or invitation.event.parking_info %}
+                    <div class="accordion" id="eventDetailsAccordion">
+                        {% if invitation.event.program_schedule %}
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="headingProgram">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseProgram" aria-expanded="false" aria-controls="collapseProgram">
+                                    <i class="fas fa-clock me-2"></i>Program Schedule
+                                </button>
+                            </h2>
+                            <div id="collapseProgram" class="accordion-collapse collapse" aria-labelledby="headingProgram" data-bs-parent="#eventDetailsAccordion">
+                                <div class="accordion-body">
+                                    <ul class="list-unstyled">
+                                        {% for item in invitation.event.program_schedule.items %}
+                                            <li class="mb-2">
+                                                <strong>{{ item.time }}</strong> - {{ item.activity }}
+                                                {% if item.description %}
+                                                    <br><small class="text-muted">{{ item.description }}</small>
+                                                {% endif %}
+                                            </li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if invitation.event.menu %}
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="headingMenu">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseMenu" aria-expanded="false" aria-controls="collapseMenu">
+                                    <i class="fas fa-utensils me-2"></i>Menu
+                                </button>
+                            </h2>
+                            <div id="collapseMenu" class="accordion-collapse collapse" aria-labelledby="headingMenu" data-bs-parent="#eventDetailsAccordion">
+                                <div class="accordion-body">
+                                    {% for category, items in invitation.event.menu.items %}
+                                        <h6 class="text-capitalize fw-bold">{{ category }}</h6>
+                                        <ul class="mb-3">
+                                            {% for item in items %}
+                                                <li>{{ item }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if invitation.event.parking_info %}
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="headingParking">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseParking" aria-expanded="false" aria-controls="collapseParking">
+                                    <i class="fas fa-parking me-2"></i>Parking Information
+                                </button>
+                            </h2>
+                            <div id="collapseParking" class="accordion-collapse collapse" aria-labelledby="headingParking" data-bs-parent="#eventDetailsAccordion">
+                                <div class="accordion-body">
+                                    {{ invitation.event.parking_info|linebreaks }}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
                     {% endif %}
                 </div>
 
