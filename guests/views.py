@@ -199,16 +199,14 @@ def send_invitation_email(invitation, request=None):
 
 @login_required
 def add_guest(request, event_id=None):
-    """Add a new guest and optionally create invitation"""
+    """Add a new guest and optionally create invitation and send email"""
     event = None
     if event_id:
         event = get_object_or_404(Event, id=event_id, created_by=request.user)
-    
     if request.method == 'POST':
         form = GuestForm(request.POST)
         if form.is_valid():
             guest = form.save()
-            
             # Create invitation if event is specified
             if event:
                 invitation, created = Invitation.objects.get_or_create(
@@ -216,7 +214,16 @@ def add_guest(request, event_id=None):
                     guest=guest
                 )
                 if created:
-                    messages.success(request, f'Guest {guest.full_name} added and invited to {event.name}!')
+                    # Send invitation email if requested
+                    if form.cleaned_data.get('send_invitation'):
+                        from .views import send_invitation_email
+                        send_invitation_email(invitation, request=request)
+                        invitation.email_sent = True
+                        invitation.email_sent_at = timezone.now()
+                        invitation.save(update_fields=['email_sent', 'email_sent_at'])
+                        messages.success(request, f'Guest {guest.full_name} added, invited, and email sent for {event.name}!')
+                    else:
+                        messages.success(request, f'Guest {guest.full_name} added and invited to {event.name}!')
                 else:
                     messages.info(request, f'Guest {guest.full_name} was already invited to {event.name}.')
                 return redirect('event_dashboard', event_id=event.id)
@@ -225,7 +232,6 @@ def add_guest(request, event_id=None):
                 return redirect('add_guest')
     else:
         form = GuestForm()
-    
     return render(request, 'guests/add_guest.html', {
         'form': form,
         'event': event
@@ -264,3 +270,56 @@ def past_events(request):
         )
     ).order_by('-date')
     return render(request, 'guests/past_events.html', {'past_events': past_events})
+
+@login_required
+def scan_barcode(request):
+    """Scan barcode and display guest information"""
+    invitation = None
+    error_message = None
+    
+    if request.method == 'POST':
+        barcode_number = request.POST.get('barcode_number', '').strip()
+        
+        if barcode_number:
+            try:
+                invitation = Invitation.objects.select_related('guest', 'event').get(barcode_number=barcode_number)
+            except Invitation.DoesNotExist:
+                error_message = f"No invitation found for barcode: {barcode_number}"
+    
+    return render(request, 'guests/scan_barcode.html', {
+        'invitation': invitation,
+        'error_message': error_message
+    })
+
+@login_required
+def check_in_guest(request, code):
+    """Check in a guest using their invitation code or barcode"""
+    invitation = get_object_or_404(Invitation, unique_code=code)
+    
+    if request.method == 'POST':
+        success = invitation.check_in_guest()
+        if success:
+            messages.success(request, f'{invitation.guest.full_name} has been checked in successfully!')
+        else:
+            messages.info(request, f'{invitation.guest.full_name} was already checked in at {invitation.check_in_time}.')
+        
+        return redirect('guest_info', code=code)
+    
+    return render(request, 'guests/check_in_confirm.html', {
+        'invitation': invitation
+    })
+
+@login_required
+def guest_info(request, code):
+    """Display detailed guest information from scanned barcode/QR code"""
+    invitation = get_object_or_404(Invitation.objects.select_related('guest', 'event'), unique_code=code)
+    
+    # Get RSVP if exists
+    rsvp = None
+    if hasattr(invitation, 'rsvp'):
+        rsvp = invitation.rsvp
+    
+    return render(request, 'guests/guest_info.html', {
+        'invitation': invitation,
+        'rsvp': rsvp
+    })

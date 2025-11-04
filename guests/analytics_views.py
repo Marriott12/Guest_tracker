@@ -2,6 +2,7 @@ from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.db.models import Count, Q, Avg
+from django.db.models.functions import TruncMonth
 from django.utils import timezone
 from datetime import timedelta
 import plotly.graph_objs as go
@@ -57,12 +58,12 @@ def analytics_dashboard(request):
     
     # 2. Events Timeline Chart
     if user_events.exists():
-        events_by_month = user_events.extra(
-            select={'month': 'DATE_FORMAT(date, "%%Y-%%m")'}
+        events_by_month = user_events.annotate(
+            month=TruncMonth('date')
         ).values('month').annotate(count=Count('id')).order_by('month')
         
         if events_by_month:
-            months = [item['month'] for item in events_by_month]
+            months = [item['month'].strftime('%Y-%m') for item in events_by_month]
             counts = [item['count'] for item in events_by_month]
             
             fig2 = go.Figure(data=[go.Bar(

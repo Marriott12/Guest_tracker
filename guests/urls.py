@@ -26,4 +26,9 @@ urlpatterns = [
 
     # Past events page
     path('past-events/', views.past_events, name='past_events'),
+    
+    # Barcode scanning and guest check-in
+    path('scan/', views.scan_barcode, name='scan_barcode'),
+    path('guest/<uuid:code>/', views.guest_info, name='guest_info'),
+    path('check-in/<uuid:code>/', views.check_in_guest, name='check_in_guest'),
 ]

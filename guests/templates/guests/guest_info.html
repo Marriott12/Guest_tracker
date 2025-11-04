@@ -1,0 +1,171 @@
+{% extends 'guests/base.html' %}
+
+{% block title %}Guest Information - Zambia Army Guest Tracking System{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0">
+                        <i class="fas fa-user-circle me-2"></i>Guest Information
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <!-- Guest Details -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <h5 class="border-bottom pb-2 mb-3">Personal Information</h5>
+                            <p><strong>Full Name:</strong><br>
+                                <span class="h4">{{ invitation.guest.full_name }}</span>
+                            </p>
+                            <p><strong>Email:</strong><br>
+                                <a href="mailto:{{ invitation.guest.email }}">{{ invitation.guest.email }}</a>
+                            </p>
+                            <p><strong>Phone:</strong><br>
+                                {% if invitation.guest.phone %}
+                                    <a href="tel:{{ invitation.guest.phone }}">{{ invitation.guest.phone }}</a>
+                                {% else %}
+                                    <em class="text-muted">Not provided</em>
+                                {% endif %}
+                            </p>
+                            {% if invitation.guest.address %}
+                            <p><strong>Address:</strong><br>
+                                {{ invitation.guest.address|linebreaks }}
+                            </p>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <h5 class="border-bottom pb-2 mb-3">Event Information</h5>
+                            <p><strong>Event Name:</strong><br>
+                                <span class="h5">{{ invitation.event.name }}</span>
+                            </p>
+                            <p><strong>Event Date:</strong><br>
+                                {{ invitation.event.date|date:"l, F d, Y" }}<br>
+                                <span class="text-muted">{{ invitation.event.date|date:"g:i A" }}</span>
+                            </p>
+                            <p><strong>Location:</strong><br>
+                                {{ invitation.event.location }}
+                            </p>
+                            <p><strong>Invitation Code:</strong><br>
+                                <code>{{ invitation.unique_code }}</code>
+                            </p>
+                            <p><strong>Barcode Number:</strong><br>
+                                <code>{{ invitation.barcode_number }}</code>
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- RSVP Details -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="border-bottom pb-2 mb-3">RSVP Information</h5>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Response Status:</strong><br>
+                                {% if rsvp %}
+                                    <span class="badge bg-{% if rsvp.response == 'yes' %}success{% elif rsvp.response == 'no' %}danger{% else %}warning{% endif %} p-2">
+                                        {{ rsvp.get_response_display }}
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-secondary p-2">No Response Yet</span>
+                                {% endif %}
+                            </p>
+                            {% if rsvp %}
+                            <p><strong>Plus Ones:</strong> {{ rsvp.plus_ones }}</p>
+                            <p><strong>Total Guests:</strong> {{ rsvp.total_guests }}</p>
+                            <p><strong>Responded On:</strong><br>
+                                {{ rsvp.responded_at|date:"F d, Y g:i A" }}
+                            </p>
+                            {% endif %}
+                        </div>
+                        
+                        {% if rsvp %}
+                        <div class="col-md-6">
+                            {% if rsvp.dietary_restrictions %}
+                            <p><strong>Dietary Restrictions:</strong><br>
+                                {{ rsvp.dietary_restrictions|linebreaks }}
+                            </p>
+                            {% endif %}
+                            {% if rsvp.special_requests %}
+                            <p><strong>Special Requests:</strong><br>
+                                {{ rsvp.special_requests|linebreaks }}
+                            </p>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Check-in Status -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="border-bottom pb-2 mb-3">Check-in Status</h5>
+                        </div>
+                        <div class="col-md-12">
+                            {% if invitation.checked_in %}
+                                <div class="alert alert-success d-flex align-items-center" role="alert">
+                                    <i class="fas fa-check-circle fa-3x me-3"></i>
+                                    <div>
+                                        <h5 class="mb-1">Guest Checked In</h5>
+                                        <p class="mb-0">Check-in Time: {{ invitation.check_in_time|date:"F d, Y g:i A" }}</p>
+                                    </div>
+                                </div>
+                            {% else %}
+                                <div class="alert alert-warning d-flex align-items-center" role="alert">
+                                    <i class="fas fa-exclamation-triangle fa-3x me-3"></i>
+                                    <div>
+                                        <h5 class="mb-1">Not Checked In</h5>
+                                        <p class="mb-0">This guest has not been checked in yet.</p>
+                                    </div>
+                                </div>
+                                <form method="post" action="{% url 'check_in_guest' invitation.unique_code %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-success btn-lg">
+                                        <i class="fas fa-check me-2"></i>Check In Guest Now
+                                    </button>
+                                </form>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Barcodes/QR Codes -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="border-bottom pb-2 mb-3">Identification Codes</h5>
+                        </div>
+                        <div class="col-md-6 text-center">
+                            {% if invitation.barcode_image %}
+                                <h6>Barcode</h6>
+                                <img src="{{ invitation.barcode_image.url }}" alt="Barcode" class="img-fluid border p-2" style="max-width: 100%;">
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6 text-center">
+                            {% if invitation.qr_code %}
+                                <h6>QR Code</h6>
+                                <img src="{{ invitation.qr_code.url }}" alt="QR Code" class="img-fluid border p-2" style="max-width: 200px;">
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="row">
+                        <div class="col-12">
+                            <a href="{% url 'scan_barcode' %}" class="btn btn-primary">
+                                <i class="fas fa-barcode me-1"></i>Scan Another Guest
+                            </a>
+                            <a href="{% url 'event_dashboard' invitation.event.id %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-calendar me-1"></i>View Event Dashboard
+                            </a>
+                            <a href="{% url 'organizer_dashboard' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-home me-1"></i>Back to Dashboard
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

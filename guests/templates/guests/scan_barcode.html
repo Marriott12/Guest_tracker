@@ -1,0 +1,125 @@
+{% extends 'guests/base.html' %}
+
+{% block title %}Scan Barcode - Zambia Army Guest Tracking System{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-barcode me-2"></i>Scan Guest Barcode
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="post" id="scanForm">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="barcode_number" class="form-label">Enter Barcode Number:</label>
+                            <input type="text" 
+                                   class="form-control form-control-lg" 
+                                   id="barcode_number" 
+                                   name="barcode_number" 
+                                   placeholder="Scan or type barcode number" 
+                                   autofocus
+                                   required>
+                            <div class="form-text">Use a barcode scanner or manually enter the barcode number</div>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-lg w-100">
+                            <i class="fas fa-search me-2"></i>Search Guest
+                        </button>
+                    </form>
+
+                    {% if error_message %}
+                    <div class="alert alert-danger mt-4" role="alert">
+                        <i class="fas fa-exclamation-triangle me-2"></i>{{ error_message }}
+                    </div>
+                    {% endif %}
+
+                    {% if invitation %}
+                    <div class="mt-4 p-4 bg-light rounded">
+                        <h5 class="text-success mb-3">
+                            <i class="fas fa-check-circle me-2"></i>Guest Found!
+                        </h5>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <strong>Name:</strong><br>
+                                <span class="h5">{{ invitation.guest.full_name }}</span>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <strong>Email:</strong><br>
+                                {{ invitation.guest.email }}
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <strong>Event:</strong><br>
+                                {{ invitation.event.name }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <strong>Event Date:</strong><br>
+                                {{ invitation.event.date|date:"F d, Y g:i A" }}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <strong>RSVP Status:</strong><br>
+                                {% if invitation.rsvp %}
+                                    <span class="badge bg-{% if invitation.rsvp.response == 'yes' %}success{% elif invitation.rsvp.response == 'no' %}danger{% else %}warning{% endif %}">
+                                        {{ invitation.rsvp.get_response_display }}
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-secondary">No Response</span>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <strong>Check-in Status:</strong><br>
+                                {% if invitation.checked_in %}
+                                    <span class="badge bg-success">
+                                        <i class="fas fa-check me-1"></i>Checked In
+                                    </span>
+                                    <br><small class="text-muted">{{ invitation.check_in_time|date:"M d, Y g:i A" }}</small>
+                                {% else %}
+                                    <span class="badge bg-warning">Not Checked In</span>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="mt-4">
+                            <a href="{% url 'guest_info' invitation.unique_code %}" class="btn btn-info me-2">
+                                <i class="fas fa-info-circle me-1"></i>View Full Details
+                            </a>
+                            {% if not invitation.checked_in %}
+                            <a href="{% url 'check_in_guest' invitation.unique_code %}" class="btn btn-success">
+                                <i class="fas fa-check me-1"></i>Check In Guest
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="mt-3 text-center">
+                <a href="{% url 'organizer_dashboard' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Auto-submit form when barcode is scanned (typically ends with Enter key)
+    document.getElementById('barcode_number').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            document.getElementById('scanForm').submit();
+        }
+    });
+</script>
+{% endblock %}

@@ -35,6 +35,11 @@ class RSVPForm(forms.ModelForm):
 
 class GuestForm(forms.ModelForm):
     """Form for adding new guests"""
+    send_invitation = forms.BooleanField(
+        required=False,
+        label="Send invitation email immediately (if adding to an event)",
+        initial=True
+    )
     
     class Meta:
         model = Guest

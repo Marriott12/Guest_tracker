@@ -35,10 +35,10 @@ class GuestAdmin(admin.ModelAdmin):
 
 @admin.register(Invitation)
 class InvitationAdmin(admin.ModelAdmin):
-    list_display = ['guest', 'event', 'email_sent', 'email_sent_at', 'rsvp_status', 'rsvp_link']
-    list_filter = ['event', 'email_sent', 'sent_at']
-    search_fields = ['guest__first_name', 'guest__last_name', 'guest__email']
-    readonly_fields = ['unique_code', 'sent_at', 'rsvp_link']
+    list_display = ['guest', 'event', 'email_sent', 'email_sent_at', 'rsvp_status', 'checked_in', 'rsvp_link']
+    list_filter = ['event', 'email_sent', 'sent_at', 'checked_in']
+    search_fields = ['guest__first_name', 'guest__last_name', 'guest__email', 'barcode_number']
+    readonly_fields = ['unique_code', 'sent_at', 'rsvp_link', 'barcode_number', 'barcode_display', 'qr_display', 'check_in_time']
     
     def rsvp_status(self, obj):
         if hasattr(obj, 'rsvp'):
@@ -58,6 +58,18 @@ class InvitationAdmin(admin.ModelAdmin):
             return format_html('<a href="{}" target="_blank">RSVP Link</a>', url)
         return '-'
     rsvp_link.short_description = 'RSVP Link'
+    
+    def barcode_display(self, obj):
+        if obj.barcode_image:
+            return format_html('<img src="{}" style="max-width: 300px;" />', obj.barcode_image.url)
+        return '-'
+    barcode_display.short_description = 'Barcode'
+    
+    def qr_display(self, obj):
+        if obj.qr_code:
+            return format_html('<img src="{}" style="max-width: 150px;" />', obj.qr_code.url)
+        return '-'
+    qr_display.short_description = 'QR Code'
 
 @admin.register(RSVP)
 class RSVPAdmin(admin.ModelAdmin):

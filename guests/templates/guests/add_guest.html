@@ -61,6 +61,15 @@
                         <div class="form-text">Internal notes about this guest (not visible to guest)</div>
                     </div>
                     
+                    {% if event %}
+                    <div class="form-check mb-3">
+                        {{ form.send_invitation }}
+                        <label class="form-check-label" for="{{ form.send_invitation.id_for_label }}">
+                            {{ form.send_invitation.label }}
+                        </label>
+                    </div>
+                    {% endif %}
+                    
                     <div class="d-flex justify-content-between">
                         <a href="{% if event %}{% url 'event_dashboard' event.id %}{% else %}#{% endif %}" 
                            class="btn btn-secondary">

@@ -5,7 +5,55 @@
 {% block content %}
 <div class="container-fluid">
     <div class="row">
-        <div class="col-12">
+        <!-- Sidebar -->
+        <nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse">
+            <div class="position-sticky pt-3">
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'organizer_dashboard' %}">
+                            <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/guests/event/">
+                            <i class="fas fa-calendar me-2"></i>Events
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/guests/guest/">
+                            <i class="fas fa-users me-2"></i>Guests
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'analytics_dashboard' %}">
+                            <i class="fas fa-chart-line me-2"></i>Analytics
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'scan_barcode' %}">
+                            <i class="fas fa-barcode me-2"></i>Scan Barcode
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'past_events' %}">
+                            <i class="fas fa-history me-2"></i>Past Events
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/">
+                            <i class="fas fa-cog me-2"></i>Admin
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+        <!-- End Sidebar -->
+
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+            <button class="btn btn-outline-primary d-md-none mb-3" type="button" data-bs-toggle="collapse" data-bs-target="#sidebarMenu" aria-controls="sidebarMenu" aria-expanded="false" aria-label="Toggle navigation">
+                <i class="fas fa-bars"></i> Menu
+            </button>
+            <!-- Main event dashboard content -->
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div>
                     <h1 class="h3 mb-0">Zambia Army Guest Tracking System - Event Dashboard</h1>
@@ -193,7 +241,7 @@
                     </div>
                 </div>
             </div>
-        </div>
+        </main>
     </div>
 </div>
 {% endblock %}

@@ -5,6 +5,8 @@ from django.utils import timezone
 from django.core.files import File
 import uuid
 import qrcode
+import barcode
+from barcode.writer import ImageWriter
 from io import BytesIO
 from PIL import Image
 import os
@@ -98,6 +100,14 @@ class Invitation(models.Model):
     # QR Code functionality
     qr_code = models.ImageField(upload_to='qr_codes/', blank=True, null=True)
     
+    # Barcode functionality
+    barcode_image = models.ImageField(upload_to='barcodes/', blank=True, null=True)
+    barcode_number = models.CharField(max_length=50, blank=True, unique=True)
+    
+    # Check-in tracking
+    checked_in = models.BooleanField(default=False)
+    check_in_time = models.DateTimeField(null=True, blank=True)
+    
     # Personal message
     personal_message = models.TextField(blank=True, help_text="Personal message for this guest")
     
@@ -108,6 +118,8 @@ class Invitation(models.Model):
         super().save(*args, **kwargs)
         if not self.qr_code:
             self.generate_qr_code()
+        if not self.barcode_image:
+            self.generate_barcode()
     
     def generate_qr_code(self):
         """Generate QR code for the invitation"""
@@ -135,6 +147,47 @@ class Invitation(models.Model):
         filename = f'qr_{self.unique_code}.png'
         self.qr_code.save(filename, File(buffer), save=False)
         super().save(update_fields=['qr_code'])
+    
+    def generate_barcode(self):
+        """Generate barcode for the invitation"""
+        # Use the UUID as the barcode number (convert to numeric string)
+        if not self.barcode_number:
+            # Create a unique numeric ID based on the invitation ID and timestamp
+            import hashlib
+            hash_str = hashlib.md5(str(self.unique_code).encode()).hexdigest()[:12]
+            self.barcode_number = ''.join([str(int(c, 16)) for c in hash_str])[:12]
+        
+        # Generate Code128 barcode
+        try:
+            code128 = barcode.get_barcode_class('code128')
+            barcode_instance = code128(self.barcode_number, writer=ImageWriter())
+            
+            # Save to memory
+            buffer = BytesIO()
+            barcode_instance.write(buffer, options={
+                'module_width': 0.3,
+                'module_height': 10,
+                'quiet_zone': 2,
+                'font_size': 10,
+                'text_distance': 3,
+            })
+            buffer.seek(0)
+            
+            # Save to model
+            filename = f'barcode_{self.unique_code}.png'
+            self.barcode_image.save(filename, File(buffer), save=False)
+            super().save(update_fields=['barcode_image', 'barcode_number'])
+        except Exception as e:
+            print(f"Error generating barcode: {e}")
+    
+    def check_in_guest(self):
+        """Mark guest as checked in"""
+        if not self.checked_in:
+            self.checked_in = True
+            self.check_in_time = timezone.now()
+            self.save(update_fields=['checked_in', 'check_in_time'])
+            return True
+        return False
     
     def get_rsvp_url(self):
         """Generate the RSVP URL for this invitation"""
