@@ -17,9 +17,19 @@ import logging
 logger = logging.getLogger(__name__)
 
 def home(request):
-    """Professional landing page - shows upcoming and past events"""
+    """Landing page with RBAC - redirects authenticated users to appropriate dashboard"""
     
-    # Get upcoming events
+    # If user is authenticated, redirect based on role
+    if request.user.is_authenticated:
+        # Check if user is admin/staff
+        if request.user.is_staff or request.user.is_superuser:
+            return redirect('organizer_dashboard')
+        else:
+            # Regular user - redirect to guest portal
+            return redirect('guest_portal')
+    
+    # For unauthenticated users, show landing page with login/signup
+    # Get upcoming events (public view)
     upcoming_events = Event.objects.filter(
         date__gte=timezone.now()
     ).annotate(
@@ -56,10 +66,20 @@ def home(request):
             'total_rsvps': total_rsvps,
             'upcoming_count': upcoming_count,
         },
-        'user': request.user
+        'show_auth_options': True,  # Flag to show login/signup buttons
     }
     
     return render(request, 'guests/landing.html', context)
+
+@login_required
+def login_redirect(request):
+    """Custom login redirect based on user role (RBAC)"""
+    if request.user.is_staff or request.user.is_superuser:
+        # Admin/Staff users go to organizer dashboard
+        return redirect('organizer_dashboard')
+    else:
+        # Regular users go to guest portal
+        return redirect('guest_portal')
 
 @login_required
 def organizer_dashboard(request):
@@ -406,6 +426,43 @@ def resend_invitation(request, invitation_id):
         return redirect('event_dashboard', event_id=invitation.event.id)
     
     return redirect('event_dashboard', event_id=invitation.event.id)
+
+@login_required
+def bulk_resend_invitations(request, event_id):
+    """Bulk resend invitation emails to all guests for an event"""
+    event = get_object_or_404(Event, id=event_id, created_by=request.user)
+    
+    if request.method == 'POST':
+        # Get all invitations for the event
+        invitations = event.invitations.all()
+        
+        success_count = 0
+        error_count = 0
+        
+        for invitation in invitations:
+            try:
+                send_invitation_email(invitation, request)
+                invitation.email_sent = True
+                invitation.email_sent_at = timezone.now()
+                invitation.status = 'sent'
+                invitation.save(update_fields=['email_sent', 'email_sent_at', 'status'])
+                success_count += 1
+                logger.info(f"Bulk resend: Invitation {invitation.id} sent to {invitation.guest.email}")
+            except Exception as e:
+                error_count += 1
+                logger.error(f"Bulk resend: Failed to send invitation {invitation.id} to {invitation.guest.email}: {str(e)}")
+        
+        if success_count > 0:
+            messages.success(request, f'Successfully sent {success_count} invitation email(s)!')
+        if error_count > 0:
+            messages.warning(request, f'Failed to send {error_count} invitation email(s). Please check the logs.')
+        
+        logger.info(f"User {request.user.username} bulk resent {success_count} invitations for event {event.id}")
+        
+        return redirect('event_dashboard', event_id=event.id)
+    
+    return redirect('event_dashboard', event_id=event.id)
+
 # Guest Portal Views - Append to views.py
 
 # Guest Portal Views

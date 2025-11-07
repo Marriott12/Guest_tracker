@@ -320,16 +320,6 @@
                     <li class="nav-item">
                         <a class="nav-link" href="#past">Past Events</a>
                     </li>
-                    {% if user.is_authenticated %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'organizer_dashboard' %}">Dashboard</a>
-                    </li>
-                    {% endif %}
-                    <li class="nav-item ms-3">
-                        <a href="/admin/" class="admin-btn">
-                            <i class="fas fa-cog me-1"></i>Admin Panel
-                        </a>
-                    </li>
                 </ul>
             </div>
         </div>
@@ -340,14 +330,16 @@
         <div class="container">
             <h1 class="display-3 fw-bold mb-3" data-aos="fade-up">Zambia Army Guest Tracking System</h1>
             <p class="lead mb-4" data-aos="fade-up" data-aos-delay="100">A world-class platform for managing military events, tracking RSVPs, and organizing guest lists with security and efficiency.</p>
-            {% if user.is_authenticated %}
-                <a href="{% url 'organizer_dashboard' %}" class="cta-button">
-                    <i class="fas fa-tachometer-alt me-2"></i>Go to Dashboard
-                </a>
-            {% else %}
-                <a href="/admin/login/" class="cta-button">
-                    <i class="fas fa-rocket me-2"></i>Get Started
-                </a>
+            {% if show_auth_options %}
+                <!-- Login and Signup Buttons for Unauthenticated Users -->
+                <div class="d-flex gap-3 justify-content-center" data-aos="fade-up" data-aos-delay="200">
+                    <a href="{% url 'login' %}" class="btn btn-light btn-lg px-5 py-3 rounded-pill shadow-lg">
+                        <i class="fas fa-sign-in-alt me-2"></i>Login
+                    </a>
+                    <a href="{% url 'guest_register' %}" class="btn btn-outline-light btn-lg px-5 py-3 rounded-pill">
+                        <i class="fas fa-user-plus me-2"></i>Sign Up
+                    </a>
+                </div>
             {% endif %}
         </div>
     </section>

@@ -6,6 +6,9 @@ urlpatterns = [
     # Home page
     path('', views.home, name='home'),
     
+    # Login redirect (RBAC)
+    path('login-redirect/', views.login_redirect, name='login_redirect'),
+    
     # Organizer dashboard
     path('dashboard/', views.organizer_dashboard, name='organizer_dashboard'),
     
@@ -24,6 +27,7 @@ urlpatterns = [
     
     # Invitation management
     path('invitation/<int:invitation_id>/resend/', views.resend_invitation, name='resend_invitation'),
+    path('event/<int:event_id>/bulk-resend-invitations/', views.bulk_resend_invitations, name='bulk_resend_invitations'),
     
     # Guest management URLs
     path('add-guest/', views.add_guest, name='add_guest'),

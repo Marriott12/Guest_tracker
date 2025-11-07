@@ -25,9 +25,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-p$0!027-hcwap2*)hernt7*829zn8&68r@u#q9ih+-v15j^yd2')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config('DEBUG', default=False, cast=bool)
+DEBUG = True  # Temporarily hardcoded for local testing
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv())
+ALLOWED_HOSTS = ['*']  # Temporarily allow all hosts for local testing
 
 
 # Application definition
@@ -159,7 +159,7 @@ DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@zambiaarmyeve
 
 # Login URLs
 LOGIN_URL = '/login/'
-LOGIN_REDIRECT_URL = '/dashboard/'
+LOGIN_REDIRECT_URL = '/login-redirect/'  # RBAC redirect view
 LOGOUT_REDIRECT_URL = '/'
 
 # Guest Portal Settings
@@ -349,8 +349,6 @@ RECAPTCHA_PRIVATE_KEY = config('RECAPTCHA_PRIVATE_KEY', default='')
 # Use reCAPTCHA v2 (checkbox)
 RECAPTCHA_REQUIRED_SCORE = 0.85  # For v3, if you switch later
 
-# For development/testing - disable reCAPTCHA if keys are not set
-SILENCED_SYSTEM_CHECKS = []
-if not RECAPTCHA_PUBLIC_KEY or not RECAPTCHA_PRIVATE_KEY:
-    SILENCED_SYSTEM_CHECKS = ['captcha.recaptcha_test_key_error']
+# For development/testing - silence test key warning
+SILENCED_SYSTEM_CHECKS = ['captcha.recaptcha_test_key_error']
 

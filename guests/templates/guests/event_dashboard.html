@@ -63,9 +63,15 @@
                     <a href="{% url 'seating_chart' event.id %}" class="btn btn-info me-2">
                         <i class="fas fa-chair me-2"></i>Seating Chart
                     </a>
-                    <a href="{% url 'send_invitations' event.id %}" class="btn btn-primary">
+                    <a href="{% url 'send_invitations' event.id %}" class="btn btn-primary me-2">
                         <i class="fas fa-envelope me-2"></i>Send Invitations
                     </a>
+                    <form method="post" action="{% url 'bulk_resend_invitations' event.id %}" style="display: inline;" onsubmit="return confirm('Resend invitation emails to ALL guests for this event?');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-warning me-2">
+                            <i class="fas fa-paper-plane me-2"></i>Bulk Resend All
+                        </button>
+                    </form>
                     <a href="{% url 'add_guest_to_event' event.id %}" class="btn btn-success">
                         <i class="fas fa-user-plus me-2"></i>Add Guest
                     </a>

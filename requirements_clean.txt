@@ -1,0 +1,14 @@
+Django==5.2.6
+django-crispy-forms==2.4
+crispy-bootstrap5==2025.6
+django-extensions==4.1
+django-filter==25.1
+django-import-export==4.3.9
+django-ratelimit==4.1.0
+django-recaptcha==3.0.0
+django-storages==1.14.6
+django-tables2==2.7.5
+Pillow==11.3.0
+python-decouple==3.8
+python-dotenv==1.0.1
+whitenoise==6.8.2
