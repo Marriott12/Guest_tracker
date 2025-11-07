@@ -63,6 +63,12 @@ git clone https://github.com/Marriott12/Guest_tracker.git guest_tracker
 1. In cPanel Terminal:
 ```bash
 cd ~/guest_tracker
+chmod +x cpanel_auto_deploy.sh
+./cpanel_auto_deploy.sh
+```
+
+Or if that doesn't work:
+```bash
 bash cpanel_auto_deploy.sh
 ```
 
