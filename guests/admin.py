@@ -33,6 +33,11 @@ class EventAdmin(admin.ModelAdmin):
             'classes': ('collapse',),
             'description': 'Enter as JSON format. Example for program: {"items": [{"time": "10:00 AM", "activity": "Opening Ceremony", "description": "Welcome speech"}]}'
         }),
+        ('Seating Arrangement', {
+            'fields': ('has_assigned_seating', 'seating_arrangement'),
+            'classes': ('collapse',),
+            'description': 'Enter seating details as JSON. Example: {"tables": [{"number": "1", "capacity": 8, "section": "VIP"}]}'
+        }),
         ('Contact Information', {
             'fields': ('contact_person', 'contact_phone', 'contact_email'),
             'classes': ('collapse',)
@@ -60,11 +65,35 @@ class GuestAdmin(admin.ModelAdmin):
 
 @admin.register(Invitation)
 class InvitationAdmin(admin.ModelAdmin):
-    list_display = ['guest', 'event', 'email_sent', 'email_sent_at', 'rsvp_status', 'checked_in', 'rsvp_link']
-    list_filter = ['event', 'email_sent', 'sent_at', 'checked_in']
-    search_fields = ['guest__first_name', 'guest__last_name', 'guest__email', 'barcode_number']
+    list_display = ['guest', 'event', 'email_sent', 'email_sent_at', 'rsvp_status', 'table_number', 'seat_number', 'checked_in', 'rsvp_link']
+    list_filter = ['event', 'email_sent', 'sent_at', 'checked_in', 'table_number']
+    search_fields = ['guest__first_name', 'guest__last_name', 'guest__email', 'barcode_number', 'table_number', 'seat_number']
     readonly_fields = ['unique_code', 'sent_at', 'rsvp_link', 'barcode_number', 'barcode_display', 'qr_display', 'check_in_time']
     actions = ['resend_invitations_action']
+    list_editable = ['table_number', 'seat_number']
+    fieldsets = (
+        ('Guest & Event', {
+            'fields': ('event', 'guest', 'unique_code')
+        }),
+        ('Seating Assignment', {
+            'fields': ('table_number', 'seat_number'),
+            'description': 'Assign table and seat numbers for this guest'
+        }),
+        ('Invitation Status', {
+            'fields': ('status', 'email_sent', 'email_sent_at', 'sent_at', 'opened_at')
+        }),
+        ('Check-in', {
+            'fields': ('checked_in', 'check_in_time')
+        }),
+        ('Codes', {
+            'fields': ('barcode_number', 'barcode_display', 'qr_display', 'rsvp_link'),
+            'classes': ('collapse',)
+        }),
+        ('Personal Message', {
+            'fields': ('personal_message',),
+            'classes': ('collapse',)
+        }),
+    )
     
     def resend_invitations_action(self, request, queryset):
         """Admin action to resend selected invitations"""

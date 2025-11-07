@@ -68,6 +68,16 @@
                             <p><strong>Barcode Number:</strong><br>
                                 <code>{{ invitation.barcode_number }}</code>
                             </p>
+                            {% if invitation.table_number or invitation.seat_number %}
+                            <p><strong>Seating Assignment:</strong><br>
+                                {% if invitation.table_number %}
+                                    Table: <span class="badge bg-primary">{{ invitation.table_number }}</span>
+                                {% endif %}
+                                {% if invitation.seat_number %}
+                                    Seat: <span class="badge bg-info">{{ invitation.seat_number }}</span>
+                                {% endif %}
+                            </p>
+                            {% endif %}
                         </div>
                     </div>
 

@@ -60,6 +60,9 @@
                     <p class="text-muted">Manage your event details, guests, and invitations here.</p>
                 </div>
                 <div>
+                    <a href="{% url 'seating_chart' event.id %}" class="btn btn-info me-2">
+                        <i class="fas fa-chair me-2"></i>Seating Chart
+                    </a>
                     <a href="{% url 'send_invitations' event.id %}" class="btn btn-primary">
                         <i class="fas fa-envelope me-2"></i>Send Invitations
                     </a>
@@ -163,6 +166,7 @@
                                 <tr>
                                     <th>Guest</th>
                                     <th>Email</th>
+                                    <th>Seating</th>
                                     <th>Invitation Status</th>
                                     <th>RSVP Status</th>
                                     <th>Plus Ones</th>
@@ -175,6 +179,18 @@
                                 <tr>
                                     <td>{{ invitation.guest.full_name }}</td>
                                     <td>{{ invitation.guest.email }}</td>
+                                    <td>
+                                        {% if invitation.table_number or invitation.seat_number %}
+                                            {% if invitation.table_number %}
+                                                <small>T: {{ invitation.table_number }}</small>
+                                            {% endif %}
+                                            {% if invitation.seat_number %}
+                                                <small>S: {{ invitation.seat_number }}</small>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
                                     <td>
                                         {% if invitation.email_sent %}
                                             <span class="badge bg-success">

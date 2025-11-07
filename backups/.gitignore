@@ -1,0 +1,4 @@
+# Backup directory
+*.sqlite3
+*.sql
+*.dump

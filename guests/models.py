@@ -61,6 +61,10 @@ class Event(models.Model):
     # Menu Information
     menu = models.JSONField(default=dict, blank=True, help_text="Event menu details as JSON")
     
+    # Seating Arrangement
+    seating_arrangement = models.JSONField(default=dict, blank=True, help_text="Seating arrangement details as JSON")
+    has_assigned_seating = models.BooleanField(default=False, help_text="Whether this event has assigned seating")
+    
     # Contact Information
     contact_person = models.CharField(max_length=200, blank=True)
     contact_phone = models.CharField(max_length=20, blank=True)
@@ -126,6 +130,10 @@ class Invitation(models.Model):
     # Check-in tracking
     checked_in = models.BooleanField(default=False)
     check_in_time = models.DateTimeField(null=True, blank=True)
+    
+    # Seating assignment
+    table_number = models.CharField(max_length=50, blank=True, help_text="Assigned table number")
+    seat_number = models.CharField(max_length=50, blank=True, help_text="Assigned seat number")
     
     # Personal message
     personal_message = models.TextField(blank=True, help_text="Personal message for this guest")

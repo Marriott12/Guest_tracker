@@ -20,6 +20,7 @@ urlpatterns = [
     path('event/<int:event_id>/dashboard/', views.event_dashboard, name='event_dashboard'),
     path('event/<int:event_id>/send-invitations/', views.send_invitations, name='send_invitations'),
     path('event/<int:event_id>/add-guest/', views.add_guest, name='add_guest_to_event'),
+    path('event/<int:event_id>/seating-chart/', views.seating_chart, name='seating_chart'),
     
     # Invitation management
     path('invitation/<int:invitation_id>/resend/', views.resend_invitation, name='resend_invitation'),

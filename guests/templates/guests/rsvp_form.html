@@ -40,6 +40,20 @@
                     <p class="mb-3">{{ invitation.event.description }}</p>
                     {% endif %}
                     
+                    {% if invitation.table_number or invitation.seat_number %}
+                    <div class="alert alert-info">
+                        <h5><i class="fas fa-chair me-2"></i>Your Seating Assignment</h5>
+                        <p class="mb-0">
+                            {% if invitation.table_number %}
+                                <strong>Table:</strong> <span class="badge bg-primary fs-6">{{ invitation.table_number }}</span>
+                            {% endif %}
+                            {% if invitation.seat_number %}
+                                <strong>Seat:</strong> <span class="badge bg-info fs-6">{{ invitation.seat_number }}</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                    {% endif %}
+                    
                     <!-- Collapsible Event Details -->
                     {% if invitation.event.program_schedule or invitation.event.menu or invitation.event.parking_info %}
                     <div class="accordion" id="eventDetailsAccordion">

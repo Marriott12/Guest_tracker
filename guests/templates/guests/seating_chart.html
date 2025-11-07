@@ -1,0 +1,151 @@
+{% extends 'guests/base.html' %}
+
+{% block title %}Seating Chart - {{ event.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 class="h3 mb-0">
+                        <i class="fas fa-chair me-2"></i>Seating Chart - {{ event.name }}
+                    </h1>
+                    <p class="text-muted">{{ event.date|date:"F d, Y g:i A" }} - {{ event.location }}</p>
+                </div>
+                <div>
+                    <a href="{% url 'event_dashboard' event.id %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                    </a>
+                </div>
+            </div>
+
+            <!-- Statistics -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body text-center">
+                            <h3>{{ seated_count }}</h3>
+                            <p class="mb-0">Seats Assigned</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-dark">
+                        <div class="card-body text-center">
+                            <h3>{{ total_invitations|add:'-'|add:seated_count }}</h3>
+                            <p class="mb-0">Unassigned</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-info text-white">
+                        <div class="card-body text-center">
+                            <h3>{{ tables|length }}</h3>
+                            <p class="mb-0">Tables</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body text-center">
+                            <h3>{{ total_invitations }}</h3>
+                            <p class="mb-0">Total Guests</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% if tables %}
+            <!-- Seating Chart -->
+            <div class="row">
+                {% for table_number, guests in tables.items %}
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-table me-2"></i>Table {{ table_number }}
+                                <span class="badge bg-light text-dark float-end">{{ guests|length }} guests</span>
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-group list-group-flush">
+                                {% for invitation in guests %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>{{ invitation.guest.full_name }}</strong>
+                                        {% if invitation.seat_number %}
+                                            <br><small class="text-muted">Seat {{ invitation.seat_number }}</small>
+                                        {% endif %}
+                                    </div>
+                                    <div>
+                                        {% if invitation.rsvp %}
+                                            {% if invitation.rsvp.response == 'yes' %}
+                                                <span class="badge bg-success">
+                                                    <i class="fas fa-check"></i> Confirmed
+                                                </span>
+                                            {% elif invitation.rsvp.response == 'no' %}
+                                                <span class="badge bg-danger">
+                                                    <i class="fas fa-times"></i> Declined
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-warning">
+                                                    <i class="fas fa-question"></i> Maybe
+                                                </span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="badge bg-secondary">
+                                                <i class="fas fa-hourglass-half"></i> Pending
+                                            </span>
+                                        {% endif %}
+                                        
+                                        {% if invitation.checked_in %}
+                                            <span class="badge bg-info ms-1">
+                                                <i class="fas fa-check-circle"></i> Checked In
+                                            </span>
+                                        {% endif %}
+                                    </div>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Print and Export Options -->
+            <div class="row mt-4">
+                <div class="col-12 text-center">
+                    <button onclick="window.print()" class="btn btn-primary">
+                        <i class="fas fa-print me-2"></i>Print Seating Chart
+                    </button>
+                    <a href="/admin/guests/invitation/?event__id__exact={{ event.id }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-edit me-2"></i>Edit Seating Assignments
+                    </a>
+                </div>
+            </div>
+            
+            {% else %}
+            
+            <div class="alert alert-info text-center">
+                <i class="fas fa-info-circle me-2 fa-2x"></i>
+                <h4>No Seating Assignments Yet</h4>
+                <p class="mb-3">
+                    No guests have been assigned to tables yet. You can assign seating in the admin panel.
+                </p>
+                <a href="/admin/guests/invitation/?event__id__exact={{ event.id }}" class="btn btn-primary">
+                    <i class="fas fa-chair me-2"></i>Assign Seating
+                </a>
+            </div>
+            
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style media="print">
+    .btn, nav, .sidebar { display: none !important; }
+    .card { break-inside: avoid; }
+</style>
+{% endblock %}

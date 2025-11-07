@@ -8,8 +8,12 @@ from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from django.db.models import Count, Q
+from django_ratelimit.decorators import ratelimit
 from .models import Event, Guest, Invitation, RSVP
 from .forms import RSVPForm, GuestForm
+import logging
+
+logger = logging.getLogger(__name__)
 
 def home(request):
     """Professional landing page - shows upcoming and past events"""
@@ -141,6 +145,7 @@ def event_dashboard(request, event_id):
     return render(request, 'guests/event_dashboard.html', context)
 
 @login_required
+@ratelimit(key='user', rate='50/h', method='POST', block=True)
 def send_invitations(request, event_id):
     """Send email invitations for an event"""
     event = get_object_or_404(Event, id=event_id, created_by=request.user)
@@ -149,6 +154,8 @@ def send_invitations(request, event_id):
         invitation_ids = request.POST.getlist('invitation_ids')
         resend = request.POST.get('resend', 'false') == 'true'
         sent_count = 0
+        
+        logger.info(f"User {request.user.username} sending invitations for event {event.name}")
         
         for invitation_id in invitation_ids:
             try:
@@ -162,7 +169,10 @@ def send_invitations(request, event_id):
                     invitation.save(update_fields=['email_sent', 'email_sent_at', 'status'])
                     sent_count += 1
             except Invitation.DoesNotExist:
+                logger.warning(f"Invitation {invitation_id} not found for event {event.id}")
                 continue
+        
+        logger.info(f"Sent {sent_count} invitations for event {event.name}")
         
         if resend:
             messages.success(request, f'Successfully resent {sent_count} invitation(s)!')
@@ -332,6 +342,32 @@ def guest_info(request, code):
     })
 
 @login_required
+def seating_chart(request, event_id):
+    """Display seating chart for an event"""
+    event = get_object_or_404(Event, id=event_id, created_by=request.user)
+    
+    # Get all invitations with assigned seating
+    seated_invitations = event.invitations.filter(
+        Q(table_number__isnull=False) | Q(seat_number__isnull=False)
+    ).select_related('guest', 'rsvp').order_by('table_number', 'seat_number')
+    
+    # Group by table
+    tables = {}
+    for invitation in seated_invitations:
+        table = invitation.table_number or 'Unassigned'
+        if table not in tables:
+            tables[table] = []
+        tables[table].append(invitation)
+    
+    return render(request, 'guests/seating_chart.html', {
+        'event': event,
+        'tables': tables,
+        'seated_count': seated_invitations.count(),
+        'total_invitations': event.invitations.count()
+    })
+
+@login_required
+@ratelimit(key='user', rate='20/h', method='POST', block=True)
 def resend_invitation(request, invitation_id):
     """Resend a single invitation email"""
     invitation = get_object_or_404(Invitation, id=invitation_id)
@@ -342,6 +378,7 @@ def resend_invitation(request, invitation_id):
         return redirect('organizer_dashboard')
     
     if request.method == 'POST':
+        logger.info(f"User {request.user.username} resending invitation {invitation.id}")
         send_invitation_email(invitation, request)
         invitation.email_sent = True
         invitation.email_sent_at = timezone.now()
