@@ -61,22 +61,48 @@
                         <div class="form-text">Internal notes about this guest (not visible to guest)</div>
                     </div>
                     
-                    {% if event %}
-                    <div class="form-check mb-3">
-                        {{ form.send_invitation }}
-                        <label class="form-check-label" for="{{ form.send_invitation.id_for_label }}">
-                            {{ form.send_invitation.label }}
+                    {% if not event %}
+                    <div class="mb-3">
+                        <label for="{{ form.event.id_for_label }}" class="form-label">
+                            {{ form.event.label }}
                         </label>
+                        {{ form.event }}
+                        {% if form.event.help_text %}
+                        <div class="form-text">{{ form.event.help_text }}</div>
+                        {% endif %}
                     </div>
                     {% endif %}
                     
+                    <div class="card bg-light mb-3">
+                        <div class="card-body">
+                            <div class="form-check">
+                                {{ form.send_invitation }}
+                                <label class="form-check-label fw-bold" for="{{ form.send_invitation.id_for_label }}">
+                                    {{ form.send_invitation.label }}
+                                </label>
+                                <div class="form-text">
+                                    {% if event %}
+                                    When checked, an invitation email will be sent immediately after adding the guest.
+                                    {% else %}
+                                    When checked and an event is selected, an invitation email will be sent immediately.
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="d-flex justify-content-between">
-                        <a href="{% if event %}{% url 'event_dashboard' event.id %}{% else %}#{% endif %}" 
+                        <a href="{% if event %}{% url 'event_dashboard' event.id %}{% else %}{% url 'organizer_dashboard' %}{% endif %}" 
                            class="btn btn-secondary">
                             <i class="fas fa-arrow-left me-2"></i>Cancel
                         </a>
-                        <button type="submit" class="btn btn-success">
-                            <i class="fas fa-save me-2"></i>Add Guest
+                        <button type="submit" class="btn btn-success btn-lg">
+                            <i class="fas fa-save me-2"></i>
+                            {% if event %}
+                            Save & Send Email
+                            {% else %}
+                            Add Guest
+                            {% endif %}
                         </button>
                     </div>
                 </form>

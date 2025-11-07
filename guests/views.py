@@ -220,10 +220,16 @@ def add_guest(request, event_id=None):
     event = None
     if event_id:
         event = get_object_or_404(Event, id=event_id, created_by=request.user)
+    
     if request.method == 'POST':
         form = GuestForm(request.POST)
         if form.is_valid():
             guest = form.save()
+            
+            # Get event from form if not from URL
+            if not event:
+                event = form.cleaned_data.get('event')
+            
             # Create invitation if event is specified
             if event:
                 invitation, created = Invitation.objects.get_or_create(
@@ -233,12 +239,11 @@ def add_guest(request, event_id=None):
                 if created:
                     # Send invitation email if requested
                     if form.cleaned_data.get('send_invitation'):
-                        from .views import send_invitation_email
                         send_invitation_email(invitation, request=request)
                         invitation.email_sent = True
                         invitation.email_sent_at = timezone.now()
                         invitation.save(update_fields=['email_sent', 'email_sent_at'])
-                        messages.success(request, f'Guest {guest.full_name} added, invited, and email sent for {event.name}!')
+                        messages.success(request, f'✅ Guest {guest.full_name} added, invited to {event.name}, and email sent!')
                     else:
                         messages.success(request, f'Guest {guest.full_name} added and invited to {event.name}!')
                 else:
@@ -248,7 +253,13 @@ def add_guest(request, event_id=None):
                 messages.success(request, f'Guest {guest.full_name} added successfully!')
                 return redirect('add_guest')
     else:
-        form = GuestForm()
+        # Initialize form with event pre-selected if coming from event dashboard
+        initial = {}
+        if event:
+            initial['event'] = event
+            initial['send_invitation'] = True
+        form = GuestForm(initial=initial)
+    
     return render(request, 'guests/add_guest.html', {
         'form': form,
         'event': event

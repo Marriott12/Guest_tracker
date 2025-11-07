@@ -37,8 +37,17 @@ class GuestForm(forms.ModelForm):
     """Form for adding new guests"""
     send_invitation = forms.BooleanField(
         required=False,
-        label="Send invitation email immediately (if adding to an event)",
-        initial=True
+        label="📧 Send invitation email immediately after saving",
+        initial=True,
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
+    )
+    
+    event = forms.ModelChoiceField(
+        queryset=Event.objects.all(),
+        required=False,
+        label="Add to Event (Optional)",
+        widget=forms.Select(attrs={'class': 'form-control'}),
+        help_text="Select an event to add this guest to and optionally send invitation"
     )
     
     class Meta:
@@ -56,9 +65,46 @@ class GuestForm(forms.ModelForm):
 class EventForm(forms.ModelForm):
     """Form for creating/editing events"""
     
+    # Override JSON fields with proper help text
+    program_schedule = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 4,
+            'placeholder': '{"items": [{"time": "10:00 AM", "activity": "Opening Ceremony", "description": "Welcome speech"}]}'
+        }),
+        help_text='Enter as JSON format. Example: {"items": [{"time": "10:00 AM", "activity": "Opening Ceremony", "description": "Welcome speech"}]}',
+        label='Program Schedule (JSON)'
+    )
+    
+    menu = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 4,
+            'placeholder': '{"courses": [{"name": "Appetizer", "items": ["Salad", "Soup"]}]}'
+        }),
+        help_text='Enter as JSON format. Example: {"courses": [{"name": "Appetizer", "items": ["Salad", "Soup"]}]}',
+        label='Menu (JSON)'
+    )
+    
+    seating_arrangement = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 4,
+            'placeholder': '{"tables": [{"number": "1", "capacity": 8, "section": "VIP"}]}'
+        }),
+        help_text='Enter seating details as JSON. Example: {"tables": [{"number": "1", "capacity": 8, "section": "VIP"}]}',
+        label='Seating Arrangement (JSON)'
+    )
+    
     class Meta:
         model = Event
-        fields = ['name', 'description', 'date', 'location', 'rsvp_deadline', 'max_guests']
+        fields = ['name', 'description', 'date', 'location', 'rsvp_deadline', 'max_guests', 
+                  'dress_code', 'parking_info', 'special_instructions', 'program_schedule', 
+                  'menu', 'seating_arrangement', 'has_assigned_seating', 'contact_person', 
+                  'contact_phone', 'contact_email', 'event_banner']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
@@ -72,7 +118,51 @@ class EventForm(forms.ModelForm):
                 'type': 'datetime-local'
             }),
             'max_guests': forms.NumberInput(attrs={'class': 'form-control', 'min': '1'}),
+            'dress_code': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g., Formal, Military Uniform'}),
+            'parking_info': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'special_instructions': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'has_assigned_seating': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'contact_person': forms.TextInput(attrs={'class': 'form-control'}),
+            'contact_phone': forms.TextInput(attrs={'class': 'form-control'}),
+            'contact_email': forms.EmailInput(attrs={'class': 'form-control'}),
+            'event_banner': forms.FileInput(attrs={'class': 'form-control'}),
         }
+    
+    def clean_program_schedule(self):
+        """Validate and parse program schedule JSON"""
+        import json
+        data = self.cleaned_data.get('program_schedule', '')
+        if not data or data.strip() == '':
+            return {}
+        try:
+            parsed = json.loads(data)
+            return parsed
+        except json.JSONDecodeError as e:
+            raise forms.ValidationError(f'Invalid JSON format for program schedule: {str(e)}')
+    
+    def clean_menu(self):
+        """Validate and parse menu JSON"""
+        import json
+        data = self.cleaned_data.get('menu', '')
+        if not data or data.strip() == '':
+            return {}
+        try:
+            parsed = json.loads(data)
+            return parsed
+        except json.JSONDecodeError as e:
+            raise forms.ValidationError(f'Invalid JSON format for menu: {str(e)}')
+    
+    def clean_seating_arrangement(self):
+        """Validate and parse seating arrangement JSON"""
+        import json
+        data = self.cleaned_data.get('seating_arrangement', '')
+        if not data or data.strip() == '':
+            return {}
+        try:
+            parsed = json.loads(data)
+            return parsed
+        except json.JSONDecodeError as e:
+            raise forms.ValidationError(f'Invalid JSON format for seating arrangement: {str(e)}')
 
 class BulkInviteForm(forms.Form):
     """Form for bulk inviting guests to an event"""
