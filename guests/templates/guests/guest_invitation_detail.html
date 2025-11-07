@@ -1,0 +1,101 @@
+{% extends 'guests/base.html' %}
+{% load static %}
+
+{% block title %}Invitation - {{ event.name }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <!-- Event Header -->
+            <div class="card mb-4 border-primary">
+                <div class="card-header bg-primary text-white text-center py-4">
+                    <h2 class="mb-0">{{ event.name }}</h2>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><i class="fas fa-calendar-alt text-primary me-2"></i><strong>Date:</strong> {{ event.date|date:"l, F d, Y" }}</p>
+                            <p><i class="fas fa-clock text-primary me-2"></i><strong>Time:</strong> {{ event.date|date:"g:i A" }}</p>
+                            <p><i class="fas fa-map-marker-alt text-primary me-2"></i><strong>Location:</strong> {{ event.location }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            {% if event.dress_code %}
+                                <p><i class="fas fa-tshirt text-primary me-2"></i><strong>Dress Code:</strong> {{ event.dress_code }}</p>
+                            {% endif %}
+                            {% if event.contact_person %}
+                                <p><i class="fas fa-user text-primary me-2"></i><strong>Contact:</strong> {{ event.contact_person }}</p>
+                            {% endif %}
+                            {% if event.contact_phone %}
+                                <p><i class="fas fa-phone text-primary me-2"></i><strong>Phone:</strong> {{ event.contact_phone }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    {% if event.description %}
+                        <hr>
+                        <p>{{ event.description }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- RSVP Status -->
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-reply me-2"></i>Your RSVP</h5>
+                </div>
+                <div class="card-body">
+                    {% if invitation.rsvp %}
+                        <div class="alert {% if invitation.rsvp.response == 'yes' %}alert-success{% elif invitation.rsvp.response == 'no' %}alert-danger{% else %}alert-warning{% endif %}">
+                            <h5>Status: 
+                                {% if invitation.rsvp.response == 'yes' %}
+                                    <span class="badge bg-success">Attending</span>
+                                {% elif invitation.rsvp.response == 'no' %}
+                                    <span class="badge bg-danger">Not Attending</span>
+                                {% else %}
+                                    <span class="badge bg-warning">Maybe</span>
+                                {% endif %}
+                            </h5>
+                            {% if invitation.rsvp.plus_ones %}
+                                <p><strong>Plus Ones:</strong> {{ invitation.rsvp.plus_ones }}</p>
+                            {% endif %}
+                            {% if invitation.rsvp.dietary_restrictions %}
+                                <p><strong>Dietary Restrictions:</strong> {{ invitation.rsvp.dietary_restrictions }}</p>
+                            {% endif %}
+                        </div>
+                        <a href="{% url 'guest_rsvp_manage' invitation.id %}" class="btn btn-primary">
+                            <i class="fas fa-edit me-2"></i>Edit RSVP
+                        </a>
+                    {% else %}
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>You haven't responded yet.
+                        </div>
+                        <a href="{% url 'guest_rsvp_manage' invitation.id %}" class="btn btn-success btn-lg">
+                            <i class="fas fa-reply me-2"></i>RSVP Now
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- QR Code -->
+            {% if invitation.qr_code %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-qrcode me-2"></i>Your QR Code</h5>
+                </div>
+                <div class="card-body text-center">
+                    <img src="{{ invitation.qr_code.url }}" alt="QR Code" class="img-fluid" style="max-width: 300px;">
+                    <p class="text-muted mt-2">Present this QR code at the event for check-in</p>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="text-center">
+                <a href="{% url 'guest_portal' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Portal
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

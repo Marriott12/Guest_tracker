@@ -81,6 +81,7 @@ class Event(models.Model):
 
 class Guest(models.Model):
     """Model for guest information"""
+    user = models.OneToOneField(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='guest_profile')
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     email = models.EmailField()
@@ -89,12 +90,48 @@ class Guest(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     notes = models.TextField(blank=True, help_text="Internal notes about the guest")
     
+    # Guest portal settings
+    can_login = models.BooleanField(default=False, help_text="Allow this guest to login to the portal")
+    last_login = models.DateTimeField(null=True, blank=True)
+    
     def __str__(self):
         return f"{self.first_name} {self.last_name}"
     
     @property
     def full_name(self):
         return f"{self.first_name} {self.last_name}"
+    
+    def create_user_account(self):
+        """Create a user account for this guest"""
+        if not self.user and self.email:
+            # Generate a random password
+            import secrets
+            password = secrets.token_urlsafe(12)
+            
+            # Create username from email
+            username = self.email.split('@')[0]
+            base_username = username
+            counter = 1
+            
+            # Ensure unique username
+            while User.objects.filter(username=username).exists():
+                username = f"{base_username}{counter}"
+                counter += 1
+            
+            # Create user
+            user = User.objects.create_user(
+                username=username,
+                email=self.email,
+                password=password,
+                first_name=self.first_name,
+                last_name=self.last_name
+            )
+            self.user = user
+            self.can_login = True
+            self.save()
+            
+            return password  # Return password so it can be emailed to guest
+        return None
     
     class Meta:
         ordering = ['last_name', 'first_name']

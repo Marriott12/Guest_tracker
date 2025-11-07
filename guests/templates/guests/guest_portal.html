@@ -1,0 +1,174 @@
+{% extends 'guests/base.html' %}
+
+{% block title %}Guest Portal - Welcome {{ guest.first_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- Header -->
+        <div class="col-12 mb-4">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h2><i class="fas fa-user-circle me-2"></i>Welcome, {{ guest.full_name }}!</h2>
+                    <p class="mb-0">Manage your invitations and update your profile</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Quick Stats -->
+        <div class="col-md-3 mb-4">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h1 class="text-warning">{{ pending_rsvps }}</h1>
+                    <p class="text-muted mb-0">Pending RSVPs</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-4">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h1 class="text-success">{{ confirmed }}</h1>
+                    <p class="text-muted mb-0">Confirmed</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-4">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h1 class="text-danger">{{ declined }}</h1>
+                    <p class="text-muted mb-0">Declined</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-4">
+            <div class="card text-center">
+                <div class="card-body">
+                    <a href="{% url 'guest_profile_edit' %}" class="btn btn-primary btn-block">
+                        <i class="fas fa-user-edit"></i> Edit Profile
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upcoming Invitations -->
+    <div class="row">
+        <div class="col-12 mb-4">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="fas fa-calendar-alt me-2"></i>Upcoming Events</h4>
+                </div>
+                <div class="card-body">
+                    {% if upcoming_invitations %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Event</th>
+                                        <th>Date</th>
+                                        <th>Location</th>
+                                        <th>RSVP Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for invitation in upcoming_invitations %}
+                                    <tr>
+                                        <td><strong>{{ invitation.event.name }}</strong></td>
+                                        <td>{{ invitation.event.date|date:"M d, Y g:i A" }}</td>
+                                        <td>{{ invitation.event.location }}</td>
+                                        <td>
+                                            {% if invitation.rsvp %}
+                                                {% if invitation.rsvp.response == 'yes' %}
+                                                    <span class="badge bg-success">Attending</span>
+                                                {% elif invitation.rsvp.response == 'no' %}
+                                                    <span class="badge bg-danger">Declined</span>
+                                                {% else %}
+                                                    <span class="badge bg-warning">Maybe</span>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="badge bg-warning">Pending</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <a href="{% url 'guest_invitation_detail' invitation.id %}" class="btn btn-sm btn-info">
+                                                <i class="fas fa-eye"></i> View
+                                            </a>
+                                            <a href="{% url 'guest_rsvp_manage' invitation.id %}" class="btn btn-sm btn-primary">
+                                                <i class="fas fa-reply"></i> 
+                                                {% if invitation.rsvp %}Edit RSVP{% else %}RSVP Now{% endif %}
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>You have no upcoming event invitations.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Past Invitations -->
+    {% if past_invitations %}
+    <div class="row">
+        <div class="col-12 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0"><i class="fas fa-history me-2"></i>Past Events</h4>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Event</th>
+                                    <th>Date</th>
+                                    <th>Your Response</th>
+                                    <th>Attended</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for invitation in past_invitations %}
+                                <tr>
+                                    <td>{{ invitation.event.name }}</td>
+                                    <td>{{ invitation.event.date|date:"M d, Y" }}</td>
+                                    <td>
+                                        {% if invitation.rsvp %}
+                                            {% if invitation.rsvp.response == 'yes' %}
+                                                <span class="badge bg-success">Accepted</span>
+                                            {% elif invitation.rsvp.response == 'no' %}
+                                                <span class="badge bg-danger">Declined</span>
+                                            {% else %}
+                                                <span class="badge bg-warning">Maybe</span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="badge bg-secondary">No Response</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if invitation.checked_in %}
+                                            <span class="badge bg-success"><i class="fas fa-check"></i> Yes</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">No</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

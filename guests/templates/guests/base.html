@@ -29,19 +29,66 @@
             <a class="navbar-brand" href="{% url 'home' %}">
                 <i class="fas fa-calendar-check me-2"></i>Zambia Army Guest Tracking System
             </a>
-            <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="{% url 'home' %}">
-                    <i class="fas fa-home me-1"></i>Home
-                </a>
-                <a class="nav-link" href="{% url 'organizer_dashboard' %}">
-                    <i class="fas fa-dashboard me-1"></i>Dashboard
-                </a>
-                <a class="nav-link" href="{% url 'analytics_dashboard' %}">
-                    <i class="fas fa-chart-line me-1"></i>Analytics
-                </a>
-                <a class="nav-link" href="/admin/">
-                    <i class="fas fa-cog me-1"></i>Admin
-                </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <div class="navbar-nav me-auto">
+                    <a class="nav-link" href="{% url 'home' %}">
+                        <i class="fas fa-home me-1"></i>Home
+                    </a>
+                    {% if user.is_authenticated %}
+                        {% if user.is_staff %}
+                            <a class="nav-link" href="{% url 'organizer_dashboard' %}">
+                                <i class="fas fa-dashboard me-1"></i>Dashboard
+                            </a>
+                            <a class="nav-link" href="{% url 'analytics_dashboard' %}">
+                                <i class="fas fa-chart-line me-1"></i>Analytics
+                            </a>
+                        {% else %}
+                            <a class="nav-link" href="{% url 'guest_portal' %}">
+                                <i class="fas fa-user-circle me-1"></i>My Portal
+                            </a>
+                        {% endif %}
+                    {% endif %}
+                </div>
+                <div class="navbar-nav ms-auto">
+                    {% if user.is_authenticated %}
+                        <div class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
+                                <i class="fas fa-user me-1"></i>{{ user.first_name|default:user.username }}
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                {% if user.is_staff %}
+                                    <li><a class="dropdown-item" href="{% url 'user_profile_edit' %}">
+                                        <i class="fas fa-user-edit me-2"></i>Edit Profile
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="/admin/">
+                                        <i class="fas fa-cog me-2"></i>Admin Panel
+                                    </a></li>
+                                {% else %}
+                                    <li><a class="dropdown-item" href="{% url 'guest_profile_edit' %}">
+                                        <i class="fas fa-user-edit me-2"></i>Edit Profile
+                                    </a></li>
+                                {% endif %}
+                                <li><a class="dropdown-item" href="{% url 'password_change' %}">
+                                    <i class="fas fa-key me-2"></i>Change Password
+                                </a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{% url 'logout' %}">
+                                    <i class="fas fa-sign-out-alt me-2"></i>Logout
+                                </a></li>
+                            </ul>
+                        </div>
+                    {% else %}
+                        <a class="nav-link" href="{% url 'login' %}">
+                            <i class="fas fa-sign-in-alt me-1"></i>Login
+                        </a>
+                        <a class="nav-link" href="{% url 'guest_register' %}">
+                            <i class="fas fa-user-plus me-1"></i>Register
+                        </a>
+                    {% endif %}
+                </div>
             </div>
         </div>
     </nav>

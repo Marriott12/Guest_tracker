@@ -6,11 +6,12 @@ from django.conf import settings
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth import login, authenticate
 from django.utils import timezone
 from django.db.models import Count, Q
 from django_ratelimit.decorators import ratelimit
 from .models import Event, Guest, Invitation, RSVP
-from .forms import RSVPForm, GuestForm
+from .forms import RSVPForm, GuestForm, GuestProfileForm, UserProfileForm, GuestRegistrationForm
 import logging
 
 logger = logging.getLogger(__name__)
@@ -405,3 +406,177 @@ def resend_invitation(request, invitation_id):
         return redirect('event_dashboard', event_id=invitation.event.id)
     
     return redirect('event_dashboard', event_id=invitation.event.id)
+# Guest Portal Views - Append to views.py
+
+# Guest Portal Views
+@login_required
+def guest_portal(request):
+    """Guest portal dashboard showing their invitations and RSVPs"""
+    try:
+        guest = request.user.guest_profile
+    except Guest.DoesNotExist:
+        messages.error(request, 'No guest profile found for your account.')
+        return redirect('home')
+    
+    # Update last login
+    guest.last_login = timezone.now()
+    guest.save(update_fields=['last_login'])
+    
+    # Get all invitations for this guest
+    invitations = Invitation.objects.filter(guest=guest).select_related('event', 'rsvp').order_by('-event__date')
+    
+    # Separate upcoming and past
+    upcoming_invitations = invitations.filter(event__date__gte=timezone.now())
+    past_invitations = invitations.filter(event__date__lt=timezone.now())
+    
+    # Count RSVPs
+    pending_rsvps = invitations.filter(rsvp__isnull=True).count()
+    confirmed = invitations.filter(rsvp__response='yes').count()
+    declined = invitations.filter(rsvp__response='no').count()
+    
+    context = {
+        'guest': guest,
+        'upcoming_invitations': upcoming_invitations,
+        'past_invitations': past_invitations,
+        'pending_rsvps': pending_rsvps,
+        'confirmed': confirmed,
+        'declined': declined,
+    }
+    
+    return render(request, 'guests/guest_portal.html', context)
+
+@login_required
+def guest_profile_edit(request):
+    """Allow guests to edit their profile"""
+    try:
+        guest = request.user.guest_profile
+    except Guest.DoesNotExist:
+        messages.error(request, 'No guest profile found.')
+        return redirect('home')
+    
+    if request.method == 'POST':
+        form = GuestProfileForm(request.POST, instance=guest)
+        if form.is_valid():
+            guest = form.save()
+            # Also update user model
+            request.user.first_name = guest.first_name
+            request.user.last_name = guest.last_name
+            request.user.email = guest.email
+            request.user.save()
+            
+            messages.success(request, '✅ Your profile has been updated successfully!')
+            return redirect('guest_portal')
+    else:
+        form = GuestProfileForm(instance=guest)
+    
+    return render(request, 'guests/guest_profile_edit.html', {
+        'form': form,
+        'guest': guest
+    })
+
+@login_required
+def user_profile_edit(request):
+    """Allow organizers/admins to edit their profile"""
+    if request.method == 'POST':
+        form = UserProfileForm(request.POST, instance=request.user)
+        if form.is_valid():
+            form.save()
+            messages.success(request, '✅ Your profile has been updated successfully!')
+            return redirect('organizer_dashboard')
+    else:
+        form = UserProfileForm(instance=request.user)
+    
+    return render(request, 'guests/user_profile_edit.html', {
+        'form': form,
+    })
+
+def guest_register(request):
+    """Allow guests to self-register for an account"""
+    if request.user.is_authenticated:
+        return redirect('guest_portal')
+    
+    if request.method == 'POST':
+        form = GuestRegistrationForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            # Log the user in
+            login(request, user)
+            messages.success(request, f'Welcome {user.first_name}! Your account has been created successfully.')
+            return redirect('guest_portal')
+    else:
+        form = GuestRegistrationForm()
+    
+    return render(request, 'guests/guest_register.html', {
+        'form': form
+    })
+
+@login_required
+def guest_rsvp_manage(request, invitation_id):
+    """Allow guests to view/edit their RSVP from the portal"""
+    invitation = get_object_or_404(Invitation, id=invitation_id)
+    
+    # Check if this guest owns this invitation
+    try:
+        guest = request.user.guest_profile
+        if invitation.guest != guest:
+            messages.error(request, 'You do not have permission to manage this invitation.')
+            return redirect('guest_portal')
+    except Guest.DoesNotExist:
+        messages.error(request, 'No guest profile found.')
+        return redirect('home')
+    
+    # Use existing RSVP form and logic
+    try:
+        rsvp = invitation.rsvp
+    except RSVP.DoesNotExist:
+        rsvp = None
+    
+    if request.method == 'POST':
+        form = RSVPForm(request.POST, instance=rsvp)
+        if form.is_valid():
+            rsvp = form.save(commit=False)
+            rsvp.invitation = invitation
+            rsvp.save()
+            
+            # Update invitation status
+            invitation.status = 'responded'
+            invitation.save(update_fields=['status'])
+            
+            messages.success(request, f'✅ Your RSVP for {invitation.event.name} has been updated!')
+            return redirect('guest_portal')
+    else:
+        form = RSVPForm(instance=rsvp)
+    
+    return render(request, 'guests/guest_rsvp_manage.html', {
+        'form': form,
+        'invitation': invitation,
+        'event': invitation.event,
+    })
+
+@login_required
+def guest_invitation_detail(request, invitation_id):
+    """Show detailed invitation information to guest"""
+    invitation = get_object_or_404(Invitation, id=invitation_id)
+    
+    # Check if this guest owns this invitation
+    try:
+        guest = request.user.guest_profile
+        if invitation.guest != guest:
+            messages.error(request, 'You do not have permission to view this invitation.')
+            return redirect('guest_portal')
+    except Guest.DoesNotExist:
+        messages.error(request, 'No guest profile found.')
+        return redirect('home')
+    
+    # Mark as opened if not already
+    if not invitation.opened_at:
+        invitation.opened_at = timezone.now()
+        invitation.status = 'opened'
+        invitation.save(update_fields=['opened_at', 'status'])
+    
+    context = {
+        'invitation': invitation,
+        'event': invitation.event,
+    }
+    
+    return render(request, 'guests/guest_invitation_detail.html', context)

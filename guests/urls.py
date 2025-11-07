@@ -35,4 +35,14 @@ urlpatterns = [
     path('scan/', views.scan_barcode, name='scan_barcode'),
     path('guest/<uuid:code>/', views.guest_info, name='guest_info'),
     path('check-in/<uuid:code>/', views.check_in_guest, name='check_in_guest'),
+    
+    # Guest Portal URLs
+    path('portal/', views.guest_portal, name='guest_portal'),
+    path('portal/profile/', views.guest_profile_edit, name='guest_profile_edit'),
+    path('portal/invitation/<int:invitation_id>/', views.guest_invitation_detail, name='guest_invitation_detail'),
+    path('portal/rsvp/<int:invitation_id>/', views.guest_rsvp_manage, name='guest_rsvp_manage'),
+    path('register/', views.guest_register, name='guest_register'),
+    
+    # User Profile URLs
+    path('profile/edit/', views.user_profile_edit, name='user_profile_edit'),
 ]
