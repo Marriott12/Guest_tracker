@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'import_export',
     'django_tables2',
     'django_filters',
+    'captcha',  # django-recaptcha
     'storages',  # For AWS S3 support
 ]
 
@@ -340,4 +341,16 @@ if REDIS_URL:
             'TIMEOUT': 300,
         }
     }
+
+# Google reCAPTCHA Configuration
+RECAPTCHA_PUBLIC_KEY = config('RECAPTCHA_PUBLIC_KEY', default='')
+RECAPTCHA_PRIVATE_KEY = config('RECAPTCHA_PRIVATE_KEY', default='')
+
+# Use reCAPTCHA v2 (checkbox)
+RECAPTCHA_REQUIRED_SCORE = 0.85  # For v3, if you switch later
+
+# For development/testing - disable reCAPTCHA if keys are not set
+SILENCED_SYSTEM_CHECKS = []
+if not RECAPTCHA_PUBLIC_KEY or not RECAPTCHA_PRIVATE_KEY:
+    SILENCED_SYSTEM_CHECKS = ['captcha.recaptcha_test_key_error']
 

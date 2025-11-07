@@ -1,7 +1,22 @@
 from django import forms
 from .models import RSVP, Guest, Event, EmailTemplate
-from django.contrib.auth.forms import UserCreationForm, PasswordChangeForm
+from django.contrib.auth.forms import UserCreationForm, PasswordChangeForm, AuthenticationForm
 from django.contrib.auth.models import User
+from captcha.fields import ReCaptchaField
+from captcha.widgets import ReCaptchaV2Checkbox
+
+class CustomLoginForm(AuthenticationForm):
+    """Custom login form with reCAPTCHA"""
+    username = forms.CharField(
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Username'})
+    )
+    password = forms.CharField(
+        widget=forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': 'Password'})
+    )
+    captcha = ReCaptchaField(
+        widget=ReCaptchaV2Checkbox(attrs={'data-theme': 'light'}),
+        label=''
+    )
 
 class RSVPForm(forms.ModelForm):
     """Form for guests to respond to invitations"""
@@ -278,6 +293,10 @@ class GuestRegistrationForm(UserCreationForm):
         max_length=20,
         required=False,
         widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': '+1234567890'})
+    )
+    captcha = ReCaptchaField(
+        widget=ReCaptchaV2Checkbox(attrs={'data-theme': 'light'}),
+        label=''
     )
     
     class Meta:
