@@ -8,7 +8,7 @@ django-ratelimit==4.1.0
 django-recaptcha==3.0.0
 django-storages==1.14.6
 django-tables2==2.7.5
-mysqlclient==2.2.6
+PyMySQL==1.1.1
 Pillow==11.3.0
 python-decouple==3.8
 python-dotenv==1.0.1
