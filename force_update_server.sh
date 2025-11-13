@@ -17,14 +17,20 @@ YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-# Project directory
-PROJECT_DIR=~/public_html/guest_tracker
-VENV_PATH=/home/envithcy/virtualenv/guest_tracker/3.11
-
-echo -e "${CYAN}Step 1: Navigating to project directory...${NC}"
-cd $PROJECT_DIR || exit 1
-echo -e "${GREEN}✓ In directory: $(pwd)${NC}"
+# Detect project directory (use current directory if it looks like the project)
+if [ -f "manage.py" ] && [ -d "guests" ]; then
+    PROJECT_DIR=$(pwd)
+    echo -e "${GREEN}✓ Running from project directory: $PROJECT_DIR${NC}"
+else
+    PROJECT_DIR=~/public_html/guest_tracker
+    echo -e "${CYAN}Step 1: Navigating to project directory...${NC}"
+    cd $PROJECT_DIR || exit 1
+    echo -e "${GREEN}✓ In directory: $(pwd)${NC}"
+fi
 echo ""
+
+# Virtual environment path
+VENV_PATH=/home/envithcy/virtualenv/guest_tracker/3.11
 
 # Backup critical files that shouldn't be in git
 echo -e "${CYAN}Step 2: Backing up critical files...${NC}"
