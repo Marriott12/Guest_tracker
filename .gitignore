@@ -27,6 +27,21 @@ share/python-wheels/
 *.egg
 MANIFEST
 
+# Backup files
+backups/
+*.bak
+*.backup
+
+# Generated static files
+staticfiles/
+
+# Obsolete scripts
+auto_configure.ps1
+configure_settings.ps1
+backup_database.ps1
+restore_database.ps1
+check_production_ready.ps1
+
 # PyInstaller
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
