@@ -15,8 +15,9 @@ from decouple import config, Csv
 import os
 
 # PyMySQL setup for MySQL database support (instead of mysqlclient)
-import pymysql
-pymysql.install_as_MySQLdb()
+# Only import/install PyMySQL when a non-SQLite DB engine is configured.
+# This avoids raising ModuleNotFoundError for local SQLite dev environments
+# where PyMySQL may not be installed.
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -108,6 +109,18 @@ else:
             'CONN_MAX_AGE': 600,  # Connection pooling
         }
     }
+
+    # If using a non-SQLite engine (e.g. MySQL), attempt to install PyMySQL as
+    # a drop-in replacement for MySQLdb. If PyMySQL isn't installed locally,
+    # defer the ImportError so local SQLite development isn't blocked.
+    if config('DB_ENGINE', default='django.db.backends.sqlite3') != 'django.db.backends.sqlite3':
+        try:
+            import pymysql
+            pymysql.install_as_MySQLdb()
+        except ImportError:
+            # Local environment may not have PyMySQL installed; database
+            # connection will fail later if the project actually needs MySQL.
+            pass
 
 
 # Password validation
@@ -353,6 +366,18 @@ RECAPTCHA_PRIVATE_KEY = config('RECAPTCHA_PRIVATE_KEY', default='')
 # Use reCAPTCHA v2 (checkbox)
 RECAPTCHA_REQUIRED_SCORE = 0.85  # For v3, if you switch later
 
-# For development/testing - silence test key warning
-SILENCED_SYSTEM_CHECKS = ['captcha.recaptcha_test_key_error']
+# For development/testing - silence test key warning only when using test keys
+# Google test keys (safe for local testing) - see RECAPTCHA docs
+_RECAPTCHA_TEST_SITE_KEY = '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI'
+_RECAPTCHA_TEST_SECRET_KEY = '6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe'
+
+# If no real keys are configured OR the Google test keys are present, silence the
+# `captcha.recaptcha_test_key_error` system check so local development doesn't fail.
+if (not RECAPTCHA_PUBLIC_KEY or not RECAPTCHA_PRIVATE_KEY) or (
+    RECAPTCHA_PUBLIC_KEY == _RECAPTCHA_TEST_SITE_KEY and RECAPTCHA_PRIVATE_KEY == _RECAPTCHA_TEST_SECRET_KEY
+):
+    SILENCED_SYSTEM_CHECKS = ['captcha.recaptcha_test_key_error']
+else:
+    # Ensure the check is not globally silenced in production when real keys exist
+    SILENCED_SYSTEM_CHECKS = []
 
