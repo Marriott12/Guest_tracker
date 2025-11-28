@@ -10,6 +10,10 @@ from barcode.writer import ImageWriter
 from io import BytesIO
 from PIL import Image
 import os
+from django.conf import settings
+from django.db import transaction
+from django.db.models import F
+import logging
 
 class EventCategory(models.Model):
     """Categories for events"""
@@ -72,12 +76,71 @@ class Event(models.Model):
     
     # Event Image/Banner
     event_banner = models.ImageField(upload_to='event_banners/', blank=True, null=True)
+    # Count of guests who have checked in (maintained on check-in)
+    checked_in_count = models.IntegerField(default=0)
     
     def __str__(self):
         return self.name
     
     class Meta:
         ordering = ['-date']
+
+
+class ProgramItem(models.Model):
+    """Individual program/agenda items for an event"""
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='program_items')
+    start_time = models.TimeField(null=True, blank=True)
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['order', 'start_time']
+
+    def __str__(self):
+        return f"{self.start_time or ''} - {self.title}"
+
+
+class MenuItem(models.Model):
+    """Menu items for an event"""
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='menu_items')
+    name = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    dietary_tags = models.CharField(max_length=200, blank=True, help_text='Comma-separated dietary tags')
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['order']
+
+    def __str__(self):
+        return self.name
+
+
+class Table(models.Model):
+    """Normalized table representation for assigned seating"""
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='tables')
+    number = models.CharField(max_length=50)
+    capacity = models.IntegerField(default=0)
+    section = models.CharField(max_length=100, blank=True)
+
+    class Meta:
+        unique_together = ['event', 'number']
+
+    def __str__(self):
+        return f"Table {self.number} ({self.event.name})"
+
+
+class Seat(models.Model):
+    """Individual seat linked to a table; can be reserved for an invitation"""
+    table = models.ForeignKey(Table, on_delete=models.CASCADE, related_name='seats')
+    number = models.CharField(max_length=50)
+    assigned_invitation = models.OneToOneField('Invitation', on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_seat')
+
+    class Meta:
+        unique_together = ['table', 'number']
+
+    def __str__(self):
+        return f"{self.table} - Seat {self.number}"
 
 class Guest(models.Model):
     """Model for guest information"""
@@ -89,6 +152,9 @@ class Guest(models.Model):
     address = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     notes = models.TextField(blank=True, help_text="Internal notes about the guest")
+    # Optional military/professional rank and institution
+    rank = models.CharField(max_length=100, blank=True, help_text="Military or professional rank/title")
+    institution = models.CharField(max_length=200, blank=True, help_text="Institution or unit (e.g., Army Division)")
     
     # Guest portal settings
     can_login = models.BooleanField(default=False, help_text="Allow this guest to login to the portal")
@@ -206,7 +272,15 @@ class Invitation(models.Model):
         buffer = BytesIO()
         qr_image.save(buffer, format='PNG')
         buffer.seek(0)
-        
+
+        # Ensure media directory exists
+        try:
+            media_root = settings.MEDIA_ROOT
+            qr_dir = os.path.join(media_root, 'qr_codes')
+            os.makedirs(qr_dir, exist_ok=True)
+        except Exception:
+            pass
+
         # Save to model
         filename = f'qr_{self.unique_code}.png'
         self.qr_code.save(filename, File(buffer), save=False)
@@ -239,6 +313,14 @@ class Invitation(models.Model):
             
             # Save to model
             filename = f'barcode_{self.unique_code}.png'
+            # Ensure media directory exists
+            try:
+                media_root = settings.MEDIA_ROOT
+                bc_dir = os.path.join(media_root, 'barcodes')
+                os.makedirs(bc_dir, exist_ok=True)
+            except Exception:
+                pass
+
             self.barcode_image.save(filename, File(buffer), save=False)
             super().save(update_fields=['barcode_image', 'barcode_number'])
         except Exception as e:
@@ -252,6 +334,139 @@ class Invitation(models.Model):
             self.save(update_fields=['checked_in', 'check_in_time'])
             return True
         return False
+
+    def check_in_guest_with_seating(self, table=None, seat=None, checked_in_by=None):
+        """Check in the guest and optionally assign seating during check-in.
+
+        Seating (table/seat) will only be assigned if provided at the time of check-in.
+        Returns True if the guest was newly checked in, False if already checked in.
+        """
+        newly_checked_in = False
+        if not self.checked_in:
+            self.checked_in = True
+            self.check_in_time = timezone.now()
+            newly_checked_in = True
+
+        # Only assign seating during check-in
+        assigned = False
+        if table is not None:
+            self.table_number = table
+            assigned = True
+        if seat is not None:
+            self.seat_number = seat
+            assigned = True
+
+        # If the event uses assigned seating and no table/seat were provided,
+        # perform a simple automatic assignment: find the first table in the
+        # event.seating_arrangement with available capacity and assign the
+        # next sequential seat number.
+        if not assigned and self.event and getattr(self.event, 'has_assigned_seating', False):
+            try:
+                tables = (self.event.seating_arrangement or {}).get('tables', [])
+                for t in tables:
+                    table_num = t.get('number')
+                    try:
+                        capacity = int(t.get('capacity', 0))
+                    except Exception:
+                        capacity = 0
+                    if not table_num or capacity <= 0:
+                        continue
+                    # Count currently assigned checked-in guests for this table
+                    assigned_count = Invitation.objects.filter(
+                        event=self.event,
+                        checked_in=True,
+                        table_number=str(table_num)
+                    ).count()
+                    if assigned_count < capacity:
+                        # Assign this table and the next seat number
+                        self.table_number = str(table_num)
+                        self.seat_number = str(assigned_count + 1)
+                        assigned = True
+                        break
+            except Exception:
+                logging.exception('Auto seat assignment failed for invitation %s', getattr(self, 'id', None))
+
+        # Prepare which fields should be saved
+        update_fields = []
+        if newly_checked_in:
+            update_fields.extend(['checked_in', 'check_in_time'])
+        if assigned:
+            update_fields.extend(['table_number', 'seat_number'])
+
+        # If newly checking in, perform seat assignment and logging atomically
+        if newly_checked_in:
+            try:
+                with transaction.atomic():
+                    # Lock invitations for this event to avoid race conditions during assignment
+                    Invitation.objects.select_for_update().filter(event=self.event)
+
+                    # If event uses assigned seating and no explicit assignment was provided,
+                    # try to reserve an available Seat row (normalized seating) first.
+                    if not assigned and getattr(self.event, 'has_assigned_seating', False):
+                        try:
+                            from .models import Seat
+                            # Find an available seat for this event
+                            seat_obj = Seat.objects.select_for_update().filter(table__event=self.event, assigned_invitation__isnull=True).order_by('table__number', 'number').first()
+                            if seat_obj:
+                                seat_obj.assigned_invitation = self
+                                seat_obj.save()
+                                self.table_number = str(seat_obj.table.number)
+                                self.seat_number = str(seat_obj.number)
+                                update_fields.extend(['table_number', 'seat_number'])
+                                assigned = True
+                            else:
+                                # Fall back to simple seating_arrangement assignment if no Seat rows exist
+                                tables = (self.event.seating_arrangement or {}).get('tables', [])
+                                for t in tables:
+                                    table_num = t.get('number')
+                                    try:
+                                        capacity = int(t.get('capacity', 0))
+                                    except Exception:
+                                        capacity = 0
+                                    if not table_num or capacity <= 0:
+                                        continue
+                                    assigned_count = Invitation.objects.filter(
+                                        event=self.event,
+                                        checked_in=True,
+                                        table_number=str(table_num)
+                                    ).count()
+                                    if assigned_count < capacity:
+                                        self.table_number = str(table_num)
+                                        self.seat_number = str(assigned_count + 1)
+                                        update_fields.extend(['table_number', 'seat_number'])
+                                        assigned = True
+                                        break
+                        except Exception:
+                            logging.exception('Auto seat assignment failed for invitation %s', getattr(self, 'id', None))
+
+                    # Save the invitation with updated fields
+                    if update_fields:
+                        self.save(update_fields=update_fields)
+
+                    # Increment event checked_in_count atomically and create log
+                    Event.objects.filter(pk=self.event.pk).update(checked_in_count=F('checked_in_count') + 1)
+                    self.event.refresh_from_db(fields=['checked_in_count'])
+
+                    CheckInLog.objects.create(
+                        event=self.event,
+                        invitation=self,
+                        guest=self.guest,
+                        checked_in_by=checked_in_by,
+                        table_number=self.table_number,
+                        seat_number=self.seat_number,
+                    )
+            except Exception:
+                logging.exception("Failed to complete atomic check-in for invitation id=%s", getattr(self, 'id', None))
+                raise
+        else:
+            # Not a new check-in: save any seating changes that were provided
+            if update_fields:
+                try:
+                    self.save(update_fields=update_fields)
+                except Exception:
+                    logging.exception('Failed to save seating updates for invitation %s', getattr(self, 'id', None))
+
+        return newly_checked_in
     
     def get_rsvp_url(self):
         """Generate the RSVP URL for this invitation"""
@@ -401,3 +616,39 @@ class EventWaitlist(models.Model):
     class Meta:
         unique_together = ['event', 'guest']
         ordering = ['position']
+
+
+class CheckInLog(models.Model):
+    """Log each check-in for analytics and auditing"""
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='checkin_logs')
+    invitation = models.ForeignKey(Invitation, on_delete=models.CASCADE, related_name='checkin_logs')
+    guest = models.ForeignKey(Guest, on_delete=models.CASCADE, related_name='checkin_logs')
+    checked_in_at = models.DateTimeField(auto_now_add=True)
+    checked_in_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    table_number = models.CharField(max_length=50, blank=True)
+    seat_number = models.CharField(max_length=50, blank=True)
+
+    def __str__(self):
+        return f"{self.guest} checked in to {self.event} at {self.checked_in_at.isoformat()}"
+
+    class Meta:
+        ordering = ['-checked_in_at']
+
+
+class CheckInSession(models.Model):
+    """Persistent record of a check-in session started by an usher/operator."""
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='checkin_sessions')
+    started_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='started_checkin_sessions')
+    started_at = models.DateTimeField(auto_now_add=True)
+    ended_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='ended_checkin_sessions')
+    ended_at = models.DateTimeField(null=True, blank=True)
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ['-started_at']
+
+    def is_active(self):
+        return self.ended_at is None
+
+    def __str__(self):
+        return f"Session for {self.event.name} started {self.started_at.isoformat()} by {self.started_by or 'unknown'}"

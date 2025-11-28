@@ -26,81 +26,41 @@
                                    required>
                             <div class="form-text">Use a barcode scanner or manually enter the barcode number</div>
                         </div>
-                        <button type="submit" class="btn btn-primary btn-lg w-100">
-                            <i class="fas fa-search me-2"></i>Search Guest
-                        </button>
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-6">
+                                <label for="table_number" class="form-label">Table Number (optional)</label>
+                                <input type="text" id="table_number" name="table_number" class="form-control" placeholder="e.g. 12" />
+                            </div>
+                            <div class="col-md-6">
+                                <label for="seat_number" class="form-label">Seat Number (optional)</label>
+                                <input type="text" id="seat_number" name="seat_number" class="form-control" placeholder="e.g. A" />
+                            </div>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button type="button" id="searchBtn" class="btn btn-primary btn-lg w-100">
+                                <i class="fas fa-search me-2"></i>Search Guest
+                            </button>
+                            <button type="button" id="checkInBtn" class="btn btn-success btn-lg w-100">
+                                <i class="fas fa-check me-2"></i>Check In Guest
+                            </button>
+                        </div>
                     </form>
 
-                    {% if error_message %}
-                    <div class="alert alert-danger mt-4" role="alert">
-                        <i class="fas fa-exclamation-triangle me-2"></i>{{ error_message }}
-                    </div>
-                    {% endif %}
-
-                    {% if invitation %}
-                    <div class="mt-4 p-4 bg-light rounded">
-                        <h5 class="text-success mb-3">
-                            <i class="fas fa-check-circle me-2"></i>Guest Found!
-                        </h5>
-                        
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <strong>Name:</strong><br>
-                                <span class="h5">{{ invitation.guest.full_name }}</span>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <strong>Email:</strong><br>
-                                {{ invitation.guest.email }}
-                            </div>
+                    <div class="mt-4">
+                        <h5>Camera Scanner (QR)</h5>
+                        <p class="text-muted">Use your device camera to scan QR codes. This complements keyboard barcode scanners.</p>
+                        <div id="cameraControls" class="mb-2">
+                            <button type="button" id="startCameraBtn" class="btn btn-outline-primary btn-sm">Start Camera</button>
+                            <button type="button" id="stopCameraBtn" class="btn btn-outline-secondary btn-sm" disabled>Stop Camera</button>
                         </div>
-                        
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <strong>Event:</strong><br>
-                                {{ invitation.event.name }}
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <strong>Event Date:</strong><br>
-                                {{ invitation.event.date|date:"F d, Y g:i A" }}
-                            </div>
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <strong>RSVP Status:</strong><br>
-                                {% if invitation.rsvp %}
-                                    <span class="badge bg-{% if invitation.rsvp.response == 'yes' %}success{% elif invitation.rsvp.response == 'no' %}danger{% else %}warning{% endif %}">
-                                        {{ invitation.rsvp.get_response_display }}
-                                    </span>
-                                {% else %}
-                                    <span class="badge bg-secondary">No Response</span>
-                                {% endif %}
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <strong>Check-in Status:</strong><br>
-                                {% if invitation.checked_in %}
-                                    <span class="badge bg-success">
-                                        <i class="fas fa-check me-1"></i>Checked In
-                                    </span>
-                                    <br><small class="text-muted">{{ invitation.check_in_time|date:"M d, Y g:i A" }}</small>
-                                {% else %}
-                                    <span class="badge bg-warning">Not Checked In</span>
-                                {% endif %}
-                            </div>
-                        </div>
-
-                        <div class="mt-4">
-                            <a href="{% url 'guest_info' invitation.unique_code %}" class="btn btn-info me-2">
-                                <i class="fas fa-info-circle me-1"></i>View Full Details
-                            </a>
-                            {% if not invitation.checked_in %}
-                            <a href="{% url 'check_in_guest' invitation.unique_code %}" class="btn btn-success">
-                                <i class="fas fa-check me-1"></i>Check In Guest
-                            </a>
-                            {% endif %}
+                        <div id="cameraArea" style="display:none;">
+                            <video id="video" autoplay muted playsinline style="width:100%;max-height:360px;border:1px solid #ddd;border-radius:6px;background:#000"></video>
+                            <canvas id="videoCanvas" style="display:none;"></canvas>
+                            <div id="cameraHint" class="form-text">Point the camera at a QR code. When detected, the invitation will be looked up.</div>
                         </div>
                     </div>
-                    {% endif %}
+
+                    <div id="scanResult" class="mt-4" style="display:none"></div>
                 </div>
             </div>
 
@@ -115,11 +75,199 @@
 
 <script>
     // Auto-submit form when barcode is scanned (typically ends with Enter key)
+    const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    async function postJson(url, data) {
+        const resp = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrftoken,
+            },
+            body: JSON.stringify(data)
+        });
+        return resp.json();
+    }
+
     document.getElementById('barcode_number').addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
             e.preventDefault();
-            document.getElementById('scanForm').submit();
+            document.getElementById('searchBtn').click();
         }
     });
+
+    document.getElementById('searchBtn').addEventListener('click', async function() {
+        const barcode = document.getElementById('barcode_number').value.trim();
+        if (!barcode) return;
+        const result = await postJson('{% url "api_check_in" %}', { barcode_number: barcode, check_in: false, table_number: document.getElementById('table_number').value.trim(), seat_number: document.getElementById('seat_number').value.trim() });
+        renderResult(result);
+    });
+
+    document.getElementById('checkInBtn').addEventListener('click', async function() {
+        const barcode = document.getElementById('barcode_number').value.trim();
+        if (!barcode) return;
+        const result = await postJson('{% url "api_check_in" %}', { barcode_number: barcode, check_in: true, table_number: document.getElementById('table_number').value.trim(), seat_number: document.getElementById('seat_number').value.trim() });
+        renderResult(result);
+    });
+
+    function renderResult(result) {
+        const container = document.getElementById('scanResult');
+        container.style.display = 'block';
+        if (!result) {
+            container.innerHTML = '<div class="alert alert-danger">No response from server</div>';
+            return;
+        }
+        if (result.status === 'forbidden') {
+            container.innerHTML = `<div class="alert alert-danger">${result.message}</div>`;
+            return;
+        }
+        if (result.status === 'not_found' || result.status === 'error') {
+            container.innerHTML = `<div class="alert alert-warning">${result.message}</div>`;
+            return;
+        }
+        if (result.status === 'ok') {
+            const inv = result.invitation;
+            const displayName = (inv.guest_rank ? (inv.guest_rank + ' ') : '') + inv.guest_name;
+            container.innerHTML = `
+                <div class="p-3 bg-light rounded">
+                    <h5 class="mb-2">${displayName}</h5>
+                    ${inv.guest_institution ? `<p><strong>Institution:</strong> ${inv.guest_institution}</p>` : ''}
+                    <p><strong>Email:</strong> ${inv.email}</p>
+                    <p><strong>Event:</strong> ${inv.event}</p>
+                    <p><strong>Checked In:</strong> ${inv.checked_in ? 'Yes' : 'No'}</p>
+                        <p><strong>Table:</strong> ${inv.table_number || 'Unassigned'} &nbsp; <strong>Seat:</strong> ${inv.seat_number || 'Unassigned'}</p>
+                        <div class="row g-2 mt-2">
+                            <div class="col-md-6">
+                                <input id="result_table_number" class="form-control" placeholder="Table (optional)" value="${inv.table_number || ''}" />
+                            </div>
+                            <div class="col-md-6">
+                                <input id="result_seat_number" class="form-control" placeholder="Seat (optional)" value="${inv.seat_number || ''}" />
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            ${inv.checked_in ? '<span class="badge bg-success">Checked In</span>' : '<button id="confirmCheckIn" class="btn btn-success">Confirm Check-In</button>'}
+                        </div>
+                </div>
+            `;
+
+            const confirmBtn = document.getElementById('confirmCheckIn');
+            if (confirmBtn) {
+                confirmBtn.addEventListener('click', async function() {
+                    const r = await postJson('{% url "api_check_in" %}', { barcode_number: inv.barcode_number, check_in: true });
+                    renderResult(r);
+                });
+            }
+        }
+    }
+</script>
+<!-- jsQR library for QR decoding -->
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<script>
+// Camera QR scanning logic
+let videoStream = null;
+let scanInterval = null;
+
+const startBtn = document.getElementById('startCameraBtn');
+const stopBtn = document.getElementById('stopCameraBtn');
+const cameraArea = document.getElementById('cameraArea');
+const video = document.getElementById('video');
+const canvas = document.getElementById('videoCanvas');
+const canvasCtx = canvas.getContext('2d');
+
+function extractUUIDFromText(text) {
+    // Matches UUID in URL or raw UUID
+    const uuidRegex = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i;
+    const m = text.match(uuidRegex);
+    return m ? m[1] : null;
+}
+
+async function handleDecodedText(text) {
+    const uuid = extractUUIDFromText(text);
+    if (uuid) {
+        // Stop camera to avoid duplicate scans
+        stopCamera();
+        document.getElementById('barcode_number').value = uuid;
+        const result = await postJson('{% url "api_check_in" %}', { unique_code: uuid, check_in: false });
+        renderResult(result);
+    } else {
+        // If no UUID, try to treat decoded text as barcode number
+        stopCamera();
+        document.getElementById('barcode_number').value = text;
+        const result = await postJson('{% url "api_check_in" %}', { barcode_number: text, check_in: false });
+        renderResult(result);
+    }
+}
+
+async function startCamera() {
+    try {
+        videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+        video.srcObject = videoStream;
+        cameraArea.style.display = 'block';
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+
+        // Set canvas size to video size when metadata loaded
+        video.addEventListener('loadedmetadata', () => {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+        });
+
+        // JSQR check (QR codes)
+        scanInterval = setInterval(() => {
+            if (video.readyState !== video.HAVE_ENOUGH_DATA) return;
+            canvasCtx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imgData = canvasCtx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: 'attemptBoth' });
+            if (code && code.data) {
+                handleDecodedText(code.data);
+            }
+        }, 300);
+
+        // ZXing fallback for 1D barcodes (Code128 etc.)
+        try {
+            // Load a reader for video streams
+            if (window.ZXing && ZXing.BrowserMultiFormatReader) {
+                window._zxingReader = new ZXing.BrowserMultiFormatReader();
+                window._zxingReader.decodeFromVideoElement(video).then(result => {
+                    if (result && result.text) {
+                        handleDecodedText(result.text);
+                    }
+                }).catch(err => {
+                    // decodeFromVideoElement returns a promise that resolves on first decode,
+                    // subsequent decodes may reject when stopping — ignore
+                    // console.log('ZXing video decode error', err);
+                });
+            }
+        } catch (e) {
+            // ignore if ZXing isn't available
+        }
+    } catch (e) {
+        console.error('Camera start failed', e);
+        alert('Unable to access camera: ' + (e.message || e));
+    }
+}
+
+function stopCamera() {
+    if (scanInterval) {
+        clearInterval(scanInterval);
+        scanInterval = null;
+    }
+    if (videoStream) {
+        videoStream.getTracks().forEach(t => t.stop());
+        videoStream = null;
+    }
+    cameraArea.style.display = 'none';
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+}
+
+startBtn.addEventListener('click', startCamera);
+stopBtn.addEventListener('click', stopCamera);
+</script>
+<!-- ZXing library for 1D barcode decoding (Code128) -->
+<script src="https://unpkg.com/@zxing/library@0.18.6/umd/index.min.js"></script>
+<script>
+// If ZXing is loaded, it will expose a global `ZXing` object.
+// The scanning loop already initializes a BrowserMultiFormatReader when available.
 </script>
 {% endblock %}

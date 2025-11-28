@@ -1,0 +1,376 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Scanner UI</title>
+  <style>
+    body{font-family:Arial,Helvetica,sans-serif;padding:20px}
+    .card{border:1px solid #ddd;padding:12px;border-radius:6px;max-width:760px}
+    .flash-success{box-shadow:0 0 0 4px rgba(40,167,69,0.25);transition:box-shadow 200ms ease}
+    .field{margin:8px 0}
+    label{display:block;font-weight:600}
+    input[type=text]{width:100%;padding:8px}
+    .btn{display:inline-block;padding:8px 12px;background:#007bff;color:#fff;border-radius:4px;text-decoration:none;margin-right:8px}
+    .muted{color:#666}
+  </style>
+</head>
+<body>
+  <h1>Guest Scanner (Staff)</h1>
+  <div class="card">
+    <div class="field">
+      <label for="event_select">Select Event (start a check-in session)</label>
+      <select id="event_select">
+        <option value="">-- Select event --</option>
+        {% for ev in events %}
+          <option value="{{ ev.id }}">{{ ev.name }} — {{ ev.date }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn" id="start_session_btn" style="background:#007b5e">Start Session</button>
+      <button class="btn" id="end_session_btn" style="background:#6c757d;display:none">End Session</button>
+      <div id="active_event" style="margin-top:8px;color:#155724;display:none">Active: <span id="active_event_name"></span></div>
+    </div>
+    <div class="field">
+      <label for="code_input">Scan or enter barcode / invitation code</label>
+      <input id="code_input" type="text" placeholder="Scan barcode or paste unique code and press Lookup" />
+    </div>
+    <div id="camera_container" style="margin-top:8px"></div>
+    <div class="field">
+      <button class="btn" id="lookup_btn">Lookup</button>
+        <button class="btn" id="start_cam_btn" style="background:#17a2b8">Start Camera</button>
+        <button class="btn" id="stop_cam_btn" style="background:#6c757d;display:none">Stop Camera</button>
+        <button class="btn" id="clear_btn" style="background:#6c757d">Clear</button>
+    </div>
+
+    <div id="result" style="margin-top:12px;display:none">
+      <h3>Guest</h3>
+      <div id="guest_info"></div>
+      <div class="field">
+        <label for="table_input">Table (optional override)</label>
+        <input id="table_input" type="text" />
+      </div>
+      <div class="field">
+        <label for="seat_input">Seat (optional override)</label>
+        <input id="seat_input" type="text" />
+      </div>
+      <div class="field">
+        <button class="btn" id="checkin_btn">Check In</button>
+        <button class="btn" id="print_btn" style="background:#28a745">Print Badge</button>
+        <span id="status_msg" class="muted" style="margin-left:12px"></span>
+      </div>
+      // Load local loaders (they will fallback to CDN if vendored libs missing)
+      (function(){
+        var s1 = document.createElement('script'); s1.src = '{% static "guests/js/jsqr_loader.js" %}'; document.head.appendChild(s1);
+        var s2 = document.createElement('script'); s2.src = '{% static "guests/js/quagga_loader.js" %}'; document.head.appendChild(s2);
+        var s3 = document.createElement('script'); s3.src = '{% static "guests/js/sortable.min.js" %}'; document.head.appendChild(s3);
+      })();
+
+      let _videoStream = null;
+      let _videoElement = null;
+      let _canvas = null;
+      let _ctx = null;
+      let _cameraActive = false;
+      let _activeEventId = null;
+      let _activeEventName = null;
+
+      function startSession(eventId, eventName){
+        _activeEventId = eventId;
+        _activeEventName = eventName;
+        document.getElementById('active_event').style.display = 'block';
+        document.getElementById('active_event_name').textContent = eventName;
+        document.getElementById('event_select').disabled = true;
+        document.getElementById('start_session_btn').style.display = 'none';
+        document.getElementById('end_session_btn').style.display = 'inline-block';
+      }
+
+      function endSession(){
+        _activeEventId = null; _activeEventName = null;
+        document.getElementById('active_event').style.display = 'none';
+        document.getElementById('active_event_name').textContent = '';
+        document.getElementById('event_select').disabled = false;
+        document.getElementById('start_session_btn').style.display = 'inline-block';
+        document.getElementById('end_session_btn').style.display = 'none';
+      }
+
+      function playBeep(){
+        try{
+          const ctx = new (window.AudioContext || window.webkitAudioContext)();
+          const o = ctx.createOscillator();
+          const g = ctx.createGain();
+          o.type = 'sine'; o.frequency.value = 880;
+          o.connect(g); g.connect(ctx.destination);
+          o.start(0); g.gain.setValueAtTime(0.1, ctx.currentTime);
+          setTimeout(function(){ o.stop(); ctx.close(); }, 120);
+        }catch(e){ /* ignore audio errors */ }
+      }
+
+      async function initCameraScan(){
+        const video = document.createElement('video');
+        video.setAttribute('playsinline','');
+          // If Quagga live is available, use it for 1D live-stream decoding (preferred for fast barcode scanning)
+          if (window.Quagga && typeof window.Quagga.init === 'function'){
+            try{
+              const target = document.getElementById('camera_container');
+              Quagga.init({
+                inputStream: {
+                  type: 'LiveStream',
+                  target: target,
+                  constraints: { facingMode: 'environment' }
+                },
+                locator: { patchSize: 'medium', halfSample: true },
+                decoder: { readers: ['code_128_reader','ean_reader','ean_8_reader'] },
+                locate: true
+              }, function(err){
+                if (err){
+                  // fallback to canvas-based scanning
+                  console.warn('Quagga init failed, falling back to canvas scan', err);
+                  startCanvasScan();
+                  return;
+                }
+                Quagga.start();
+                _cameraActive = true;
+                Quagga.onDetected(function(result){
+                  if (result && result.codeResult && result.codeResult.code){
+                    document.getElementById('code_input').value = result.codeResult.code;
+                    document.getElementById('lookup_btn').click();
+                    playBeep();
+                  }
+                });
+              });
+            }catch(e){ console.warn('Quagga live error', e); startCanvasScan(); }
+          } else {
+            // No Quagga live; use canvas/jsQR approach
+            startCanvasScan();
+          }
+
+          function startCanvasScan(){
+            (async function(){
+              let stream = null;
+              try{
+                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio:false });
+                video.srcObject = stream;
+                await video.play();
+              }catch(e){ showError('Camera not available or permission denied'); return; }
+              _videoStream = stream; _videoElement = video; _canvas = document.createElement('canvas'); _ctx = _canvas.getContext('2d');
+              document.getElementById('camera_container').appendChild(video);
+              video.style.width='320px'; video.style.height='240px'; video.style.display='block';
+              _cameraActive = true;
+
+              function frameLoop(){
+                if (!_cameraActive) return;
+                if (video.readyState === video.HAVE_ENOUGH_DATA){
+                  _canvas.width = video.videoWidth; _canvas.height = video.videoHeight; _ctx.drawImage(video,0,0,_canvas.width,_canvas.height);
+                  if (window.jsQR){
+                    try{
+                      const imageData = _ctx.getImageData(0,0,_canvas.width,_canvas.height);
+                      const code = jsQR(imageData.data, imageData.width, imageData.height);
+                      if (code && code.data){
+                        document.getElementById('code_input').value = code.data; document.getElementById('lookup_btn').click(); playBeep();
+                      }
+                    }catch(e){ }
+                  } else if (window.Quagga){
+                    try{
+                      Quagga.decodeSingle({ src: _canvas.toDataURL(), numOfWorkers:0, decoder:{ readers:['code_128_reader','ean_reader','ean_8_reader'] } }, function(result){
+                        if (result && result.codeResult && result.codeResult.code){ document.getElementById('code_input').value = result.codeResult.code; document.getElementById('lookup_btn').click(); playBeep(); }
+                      });
+                    }catch(e){}
+                  }
+                }
+                requestAnimationFrame(frameLoop);
+              }
+              frameLoop();
+            })();
+          }
+      }
+
+      function stopCamera(){
+        try{
+          if (window.Quagga && typeof window.Quagga.stop === 'function'){
+            try{ Quagga.stop(); Quagga.offDetected(); }catch(e){}
+          }
+          if (_videoStream){ _videoStream.getTracks().forEach(t=>t.stop()); _videoStream = null; }
+          if (_videoElement){ _videoElement.remove(); _videoElement = null; }
+          // clear camera container
+          const container = document.getElementById('camera_container');
+          if (container) container.innerHTML = '';
+          _cameraActive = false;
+        }catch(e){}
+      }
+
+      document.getElementById('start_cam_btn').addEventListener('click', function(){
+        initCameraScan();
+        document.getElementById('start_cam_btn').style.display='none';
+        document.getElementById('stop_cam_btn').style.display='inline-block';
+      });
+      document.getElementById('stop_cam_btn').addEventListener('click', function(){
+        stopCamera();
+        document.getElementById('start_cam_btn').style.display='inline-block';
+        document.getElementById('stop_cam_btn').style.display='none';
+      });
+
+      document.getElementById('start_session_btn').addEventListener('click', function(){
+        const sel = document.getElementById('event_select');
+        const val = sel.value;
+        if (!val){ alert('Please select an event to start the session'); return; }
+        const name = sel.options[sel.selectedIndex].text;
+        // Call server to create shared session
+        fetch('/api/check-in-session/start/', {
+          method: 'POST', headers: {'Content-Type':'application/json', 'X-CSRFToken': csrftoken}, body: JSON.stringify({event_id: val})
+        }).then(r=>r.json()).then(js=>{
+          if (js.status === 'ok') startSession(val, name);
+          else alert(js.message || 'Failed to start session');
+        }).catch(e=>{ alert('Network error starting session'); });
+      });
+
+      document.getElementById('end_session_btn').addEventListener('click', function(){
+        if (!confirm('End this check-in session?')) return;
+        // Call server to end current session
+        fetch('/api/check-in-session/end/', { method: 'POST', headers: {'Content-Type':'application/json', 'X-CSRFToken': csrftoken}, body: JSON.stringify({event_id: _activeEventId}) }).then(r=>r.json()).then(js=>{
+          if (js.status === 'ok') endSession(); else alert(js.message || 'Failed to end session');
+        }).catch(e=>{ alert('Network error ending session'); });
+      });
+
+      function getCookie(name){
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== ''){
+          const cookies = document.cookie.split(';');
+          for (let i=0;i<cookies.length;i++){
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')){
+              cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+              break;
+            }
+          }
+        }
+        return cookieValue;
+      }
+
+      const csrftoken = getCookie('csrftoken');
+
+function showError(msg){
+  const el = document.getElementById('error');
+  el.style.display = 'block';
+  el.textContent = msg;
+}
+
+function clearError(){
+  const el = document.getElementById('error');
+  el.style.display = 'none';
+  el.textContent = '';
+}
+
+function populateResult(data){
+  const info = document.getElementById('guest_info');
+  info.innerHTML = '';
+  const inv = data.invitation || {};
+  const lines = [];
+  lines.push(`<strong>${inv.guest_name}</strong> (${inv.email})`);
+  if (inv.guest_rank) lines.push(`Rank: ${inv.guest_rank}`);
+  if (inv.guest_institution) lines.push(`Institution: ${inv.guest_institution}`);
+  lines.push(`Event: ${inv.event}`);
+  lines.push(`Currently checked_in: ${inv.checked_in}`);
+  info.innerHTML = lines.map(l=>`<div>${l}</div>`).join('');
+
+  document.getElementById('table_input').value = inv.table_number || '';
+  document.getElementById('seat_input').value = inv.seat_number || '';
+
+  document.getElementById('result').style.display = 'block';
+  clearError();
+}
+
+async function lookup(code){
+  clearError();
+  document.getElementById('status_msg').textContent = '';
+  try{
+    const payload = { barcode_number: code };
+    if (_activeEventId) payload.event_id = _activeEventId;
+    const resp = await fetch('/api/check-in/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+      body: JSON.stringify(payload)
+    });
+    const data = await resp.json();
+    if (!resp.ok){
+      showError(data.message || 'Lookup failed');
+      return null;
+    }
+    return data;
+  }catch(e){ showError('Network error during lookup'); return null; }
+}
+
+async function doCheckin(code, table, seat){
+  clearError();
+  document.getElementById('status_msg').textContent = 'Checking in...';
+  try{
+    const payload = { barcode_number: code, check_in: true };
+    if (_activeEventId) payload.event_id = _activeEventId;
+    if (table) payload.table_number = table;
+    if (seat) payload.seat_number = seat;
+    const resp = await fetch('/api/check-in/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+      body: JSON.stringify(payload)
+    });
+    const data = await resp.json();
+    if (!resp.ok){
+      showError(data.message || 'Check-in failed');
+      document.getElementById('status_msg').textContent = '';
+      return null;
+    }
+    document.getElementById('status_msg').textContent = 'Checked in ✓';
+    populateResult(data);
+    // Visual flash to indicate success
+    try{
+      const card = document.querySelector('.card');
+      if (card){ card.classList.add('flash-success'); setTimeout(()=>card.classList.remove('flash-success'), 900); }
+    }catch(e){}
+    return data;
+  }catch(e){ showError('Network error during check-in'); document.getElementById('status_msg').textContent = ''; return null }
+}
+
+document.getElementById('lookup_btn').addEventListener('click', async function(){
+  const code = document.getElementById('code_input').value.trim();
+  if (!code) { showError('Please enter a code'); return }
+  const data = await lookup(code);
+  if (data) populateResult(data);
+});
+
+// Press Enter in the code input to perform Lookup
+document.getElementById('code_input').addEventListener('keydown', function(e){
+  if (e.key === 'Enter'){
+    e.preventDefault();
+    document.getElementById('lookup_btn').click();
+  }
+});
+
+document.getElementById('checkin_btn').addEventListener('click', async function(){
+  const code = document.getElementById('code_input').value.trim();
+  if (!code) { showError('Please enter a code'); return }
+  const table = document.getElementById('table_input').value.trim();
+  const seat = document.getElementById('seat_input').value.trim();
+  await doCheckin(code, table, seat);
+});
+
+document.getElementById('print_btn').addEventListener('click', function(){
+  const info = document.getElementById('guest_info').innerHTML;
+  const table = document.getElementById('table_input').value;
+  const seat = document.getElementById('seat_input').value;
+  const w = window.open('','printwin','width=400,height=300');
+  w.document.write('<html><head><title>Guest Badge</title></head><body>');
+  w.document.write('<h2>Guest Seating</h2>');
+  w.document.write(info);
+  w.document.write('<div><strong>Table:</strong> ' + (table || '—') + '</div>');
+  w.document.write('<div><strong>Seat:</strong> ' + (seat || '—') + '</div>');
+  w.document.write('<div style="margin-top:12px"><button onclick="window.print()">Print</button></div>');
+  w.document.write('</body></html>');
+  w.document.close();
+});
+
+document.getElementById('clear_btn').addEventListener('click', function(){
+  document.getElementById('code_input').value = '';
+  document.getElementById('result').style.display = 'none';
+  clearError();
+});
+</script>
+</body>
+</html>

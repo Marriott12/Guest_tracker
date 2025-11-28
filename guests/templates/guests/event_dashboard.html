@@ -161,6 +161,45 @@
                 </div>
             </div>
 
+            <div class="mb-4">
+                {% if request.user.is_staff %}
+                <div class="card mb-3">
+                    <div class="card-body d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="mb-0">Checked In</h4>
+                            <p class="mb-0 text-success h3">{{ event.checked_in_count }}</p>
+                        </div>
+                        <div>
+                            <a href="{% url 'admin:guests_event_checkin_summary' event.id %}" class="btn btn-outline-secondary" target="_blank">
+                                <i class="fas fa-file-csv me-2"></i>Download CSV
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <form id="checkin-summary-form" class="row g-2 align-items-end">
+                            <div class="col-auto">
+                                <label for="summaryStart" class="form-label mb-0">Start</label>
+                                <input type="datetime-local" class="form-control" id="summaryStart" name="start">
+                            </div>
+                            <div class="col-auto">
+                                <label for="summaryEnd" class="form-label mb-0">End</label>
+                                <input type="datetime-local" class="form-control" id="summaryEnd" name="end">
+                            </div>
+                            <div class="col-auto">
+                                <button type="button" class="btn btn-primary" id="fetchSummaryBtn">
+                                    <i class="fas fa-chart-bar me-2"></i>Fetch Summary
+                                </button>
+                            </div>
+                        </form>
+                        <div id="checkin-summary-results" class="mt-4"></div>
+                        <canvas id="checkinSummaryChart" height="120" style="max-width:100%;"></canvas>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
             <div class="card">
                 <div class="card-header">
                     <h5><i class="fas fa-users me-2"></i>Guest List</h5>
@@ -279,4 +318,53 @@
         </main>
     </div>
 </div>
+{% endblock %}
+{% block extra_js %}
+{% if request.user.is_staff %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.getElementById('fetchSummaryBtn').onclick = function() {
+    const start = document.getElementById('summaryStart').value;
+    const end = document.getElementById('summaryEnd').value;
+    const params = [];
+    if (start) params.push('start=' + encodeURIComponent(start.replace('T', ' ')));
+    if (end) params.push('end=' + encodeURIComponent(end.replace('T', ' ')));
+    const url = `{% url 'checkin_summary_json' event.id %}` + (params.length ? '?' + params.join('&') : '');
+    fetch(url)
+        .then(resp => resp.json())
+        .then(data => {
+            let html = '<h5>Checked-In Summary</h5>';
+            html += '<table class="table table-bordered"><thead><tr><th>Table</th><th>Count</th></tr></thead><tbody>';
+            for (const row of data.table_agg) {
+                html += `<tr><td>${row.table_number || 'Unassigned'}</td><td>${row.count}</td></tr>`;
+            }
+            html += '</tbody></table>';
+            document.getElementById('checkin-summary-results').innerHTML = html;
+
+            // Chart.js bar chart for hourly counts
+            const ctx = document.getElementById('checkinSummaryChart').getContext('2d');
+            const labels = data.hour_agg.map(r => r.hour);
+            const counts = data.hour_agg.map(r => r.count);
+            if (window.checkinChart) window.checkinChart.destroy();
+            window.checkinChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Check-ins per Hour',
+                        data: counts,
+                        backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                    }]
+                },
+                options: {
+                    scales: {
+                        x: { title: { display: true, text: 'Hour (UTC)' } },
+                        y: { title: { display: true, text: 'Check-ins' }, beginAtZero: true }
+                    }
+                }
+            });
+        });
+};
+</script>
+{% endif %}
 {% endblock %}

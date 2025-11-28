@@ -1,0 +1,11 @@
+{
+  "menu_name": "Conference Lunch Menu",
+  "date": "2025-12-12",
+  "courses": [
+    {"course": "Starter", "items": ["Caesar Salad", "Tomato Basil Soup"]},
+    {"course": "Main", "items": ["Grilled Salmon with Lemon Butter", "Roast Chicken with Herbs", "Vegetarian Lasagna"]},
+    {"course": "Sides", "items": ["Roasted Potatoes", "Seasonal Vegetables"]},
+    {"course": "Dessert", "items": ["Chocolate Mousse", "Fruit Tart"]},
+    {"course": "Beverages", "items": ["Coffee", "Tea", "Assorted Soft Drinks"]}
+  ]
+}

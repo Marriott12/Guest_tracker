@@ -1,0 +1,7 @@
+{
+  "tables": [
+    {"number": "1", "capacity": 8, "section": "VIP", "assigned": [{"seat": 1, "guest_name": "Capt. John Smith", "rank": "Capt.", "institution": "1st Infantry"}, {"seat": 2, "guest_name": "Ms. Jane Doe", "rank": "", "institution": "Acme Corp"}]},
+    {"number": "2", "capacity": 10, "section": "General", "assigned": []},
+    {"number": "A1", "capacity": 4, "section": "Speakers", "assigned": [{"seat": 1, "guest_name": "Dr. Alex Johnson", "rank": "Dr.", "institution": "State University"}]}
+  ]
+}

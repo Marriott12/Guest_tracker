@@ -1,6 +1,44 @@
+from django.http import JsonResponse, HttpResponse
+from django.db.models import Count
+from django.db.models.functions import TruncHour
+from django.contrib.auth.decorators import login_required
+
+@login_required
+def checkin_summary_json(request, event_id):
+    """Return JSON aggregates for check-ins for an event, filtered by optional start/end, requires export_checkin permission."""
+    from django.core.exceptions import PermissionDenied
+    if not request.user.has_perm('guests.export_checkin') and not request.user.is_superuser:
+        raise PermissionDenied
+
+    start = request.GET.get('start')
+    end = request.GET.get('end')
+    from .models import CheckInLog
+    qs = CheckInLog.objects.filter(event_id=event_id)
+    if start:
+        from django.utils.dateparse import parse_datetime
+        dt = parse_datetime(start)
+        if dt is not None:
+            qs = qs.filter(checked_in_at__gte=dt)
+    if end:
+        from django.utils.dateparse import parse_datetime
+        dt = parse_datetime(end)
+        if dt is not None:
+            qs = qs.filter(checked_in_at__lte=dt)
+
+    table_agg = list(qs.values('table_number').annotate(count=Count('id')).order_by('-count'))
+    hour_agg = list(qs.annotate(hour=TruncHour('checked_in_at')).values('hour').annotate(count=Count('id')).order_by('hour'))
+
+    return JsonResponse({
+        'table_agg': table_agg,
+        'hour_agg': [
+            {'hour': row['hour'].isoformat() if row['hour'] else '', 'count': row['count']}
+            for row in hour_agg
+        ]
+    })
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
-from django.core.mail import send_mail
+from django.core.mail import send_mail, EmailMessage, EmailMultiAlternatives
+from email.mime.image import MIMEImage
 from django.template.loader import render_to_string
 from django.conf import settings
 from django.http import JsonResponse
@@ -10,9 +48,24 @@ from django.contrib.auth import login, authenticate
 from django.utils import timezone
 from django.db.models import Count, Q
 from django_ratelimit.decorators import ratelimit
+from django.views.decorators.http import require_POST
+import json
 from .models import Event, Guest, Invitation, RSVP
+from .models import CheckInSession
+from django.core.cache import cache
 from .forms import RSVPForm, GuestForm, GuestProfileForm, UserProfileForm, GuestRegistrationForm
 import logging
+import os
+
+# Optional Google reCAPTCHA Enterprise client
+try:
+    from google.cloud import recaptchaenterprise_v1
+    from google.oauth2 import service_account
+    RECAPTCHA_ENTERPRISE_AVAILABLE = True
+except Exception:
+    recaptchaenterprise_v1 = None
+    service_account = None
+    RECAPTCHA_ENTERPRISE_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -225,15 +278,53 @@ def send_invitation_email(invitation, request=None):
     
     html_message = render_to_string('guests/invitation_email.html', context)
     plain_message = render_to_string('guests/invitation_email.txt', context)
-    
-    send_mail(
+
+    # Use EmailMultiAlternatives to support HTML + inline images
+    msg = EmailMultiAlternatives(
         subject=subject,
-        message=plain_message,
-        html_message=html_message,
+        body=plain_message,
         from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[invitation.guest.email],
-        fail_silently=False,
+        to=[invitation.guest.email],
     )
+    msg.attach_alternative(html_message, 'text/html')
+
+    # Prepare CIDs and attach images inline if available
+    qr_cid = None
+    barcode_cid = None
+    try:
+        if invitation.qr_code and hasattr(invitation.qr_code, 'path') and os.path.exists(invitation.qr_code.path):
+            with open(invitation.qr_code.path, 'rb') as f:
+                img_data = f.read()
+                mime_img = MIMEImage(img_data)
+                qr_cid = f"qr-{invitation.id}@guesttracker"
+                mime_img.add_header('Content-ID', f"<{qr_cid}>")
+                mime_img.add_header('Content-Disposition', 'inline', filename=os.path.basename(invitation.qr_code.name))
+                msg.attach(mime_img)
+    except Exception:
+        logger.exception('Failed to attach QR code for invitation %s', getattr(invitation, 'id', None))
+
+    try:
+        if invitation.barcode_image and hasattr(invitation.barcode_image, 'path') and os.path.exists(invitation.barcode_image.path):
+            with open(invitation.barcode_image.path, 'rb') as f:
+                img_data = f.read()
+                mime_img = MIMEImage(img_data)
+                barcode_cid = f"barcode-{invitation.id}@guesttracker"
+                mime_img.add_header('Content-ID', f"<{barcode_cid}>")
+                mime_img.add_header('Content-Disposition', 'inline', filename=os.path.basename(invitation.barcode_image.name))
+                msg.attach(mime_img)
+    except Exception:
+        logger.exception('Failed to attach barcode image for invitation %s', getattr(invitation, 'id', None))
+
+    # If we attached images, re-render HTML with the CID references
+    if qr_cid or barcode_cid:
+        context['qr_cid'] = qr_cid
+        context['barcode_cid'] = barcode_cid
+        html_message = render_to_string('guests/invitation_email.html', context)
+        # replace existing HTML alternative using the public API
+        msg.alternatives = []
+        msg.attach_alternative(html_message, 'text/html')
+
+    msg.send(fail_silently=False)
 
 @login_required
 def add_guest(request, event_id=None):
@@ -328,16 +419,209 @@ def scan_barcode(request):
     
     if request.method == 'POST':
         barcode_number = request.POST.get('barcode_number', '').strip()
+        event_id = request.POST.get('event_id') or request.GET.get('event_id')
         
         if barcode_number:
             try:
-                invitation = Invitation.objects.select_related('guest', 'event').get(barcode_number=barcode_number)
+                if event_id:
+                    invitation = Invitation.objects.select_related('guest', 'event').get(barcode_number=barcode_number, event_id=event_id)
+                else:
+                    invitation = Invitation.objects.select_related('guest', 'event').get(barcode_number=barcode_number)
             except Invitation.DoesNotExist:
                 error_message = f"No invitation found for barcode: {barcode_number}"
     
     return render(request, 'guests/scan_barcode.html', {
         'invitation': invitation,
         'error_message': error_message
+    })
+
+
+@login_required
+def scanner_ui(request):
+    """Staff-facing scanner UI that looks up an invitation and allows optional table/seat override before check-in."""
+    if not (request.user.is_staff or request.user.is_superuser):
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied
+    # Provide a list of upcoming events for the usher to select which check-in session to start
+    from django.utils import timezone
+    events = Event.objects.filter(date__gte=timezone.now()).order_by('date').values('id', 'name', 'date')[:50]
+    return render(request, 'guests/scanner_ui.html', {'events': list(events)})
+
+
+@require_POST
+@ratelimit(key='user', rate='60/h', method='POST', block=True)
+@login_required
+def api_check_in(request):
+    """API endpoint for scanning/checking-in a guest via barcode or unique code.
+
+    Accepts JSON body with one of:
+      - barcode_number
+      - unique_code
+    Optional fields:
+      - check_in: boolean (if true, perform check-in)
+      - table_number, seat_number: strings to assign seating
+
+    Returns JSON with invitation and guest info or an error message.
+    """
+    logger.info(f"api_check_in called by user={getattr(request.user, 'username', 'anonymous')} from {request.META.get('REMOTE_ADDR')}")
+
+    # Enforce role-based permission: only staff/superusers can perform check-ins
+    if not (request.user.is_staff or request.user.is_superuser):
+        logger.warning(f"Unauthorized check-in attempt by user={getattr(request.user, 'username', 'anonymous')}")
+        return JsonResponse({'status': 'forbidden', 'message': 'User not authorized to perform check-ins.'}, status=403)
+
+    try:
+        data = json.loads(request.body.decode('utf-8'))
+    except Exception:
+        # Fallback to POST form-encoded
+        data = request.POST
+
+    barcode = data.get('barcode_number') or data.get('barcode')
+    unique_code = data.get('unique_code')
+    event_id = data.get('event_id') or data.get('event')
+    do_check = data.get('check_in') in [True, 'true', 'True', '1', 1]
+    table = data.get('table_number')
+    seat = data.get('seat_number')
+
+    # If the deployment requires a barcode for check-ins, reject non-barcode requests
+    if do_check and getattr(settings, 'CHECKIN_REQUIRE_BARCODE', False) and not barcode:
+        return JsonResponse({'status': 'error', 'message': 'Barcode required for check-in by server configuration.'}, status=400)
+
+    # If session enforcement is enabled, require event_id and an active session for that event
+    if getattr(settings, 'CHECKIN_SESSION_ENFORCE', False) and (request.user.is_staff or request.user.is_superuser):
+        if not event_id:
+            return JsonResponse({'status': 'error', 'message': 'event_id is required while check-in sessions are enforced.'}, status=400)
+        session_key = f'guests:checkin_session:{event_id}'
+        active = cache.get(session_key)
+        if not active:
+            return JsonResponse({'status': 'error', 'message': 'No active check-in session for the requested event.'}, status=400)
+
+    invitation = None
+    if barcode:
+        try:
+            if event_id:
+                invitation = Invitation.objects.select_related('guest', 'event').get(barcode_number=barcode, event_id=event_id)
+            else:
+                invitation = Invitation.objects.select_related('guest', 'event').get(barcode_number=barcode)
+        except Invitation.DoesNotExist:
+            logger.info(f"api_check_in: barcode not found: {barcode}")
+            return JsonResponse({'status': 'not_found', 'message': f'No invitation found for barcode {barcode}'}, status=404)
+    elif unique_code:
+        try:
+            if event_id:
+                invitation = Invitation.objects.select_related('guest', 'event').get(unique_code=unique_code, event_id=event_id)
+            else:
+                invitation = Invitation.objects.select_related('guest', 'event').get(unique_code=unique_code)
+        except Invitation.DoesNotExist:
+            logger.info(f"api_check_in: unique code not found: {unique_code}")
+            return JsonResponse({'status': 'not_found', 'message': f'No invitation found for code {unique_code}'}, status=404)
+    else:
+        return JsonResponse({'status': 'error', 'message': 'No identifier provided (barcode_number or unique_code required).'}, status=400)
+
+    # Only assign seating when performing check-in.
+    if do_check:
+        # Use the new method that assigns seating only during check-in
+        checked = invitation.check_in_guest_with_seating(table=table, seat=seat, checked_in_by=request.user)
+
+
+    payload = {
+        'status': 'ok',
+        'invitation': {
+            'guest_name': invitation.guest.full_name,
+            'guest_rank': getattr(invitation.guest, 'rank', '') or '',
+            'guest_institution': getattr(invitation.guest, 'institution', '') or '',
+            'email': invitation.guest.email,
+            'event': invitation.event.name,
+            'checked_in': invitation.checked_in,
+            'check_in_time': invitation.check_in_time.isoformat() if invitation.check_in_time else None,
+            # Only include seating details if guest is checked in
+            'table_number': invitation.table_number if invitation.checked_in else None,
+            'seat_number': invitation.seat_number if invitation.checked_in else None,
+            'barcode_number': invitation.barcode_number,
+            'unique_code': str(invitation.unique_code),
+        }
+    }
+
+    logger.info(f"api_check_in success for invitation={invitation.id} user={request.user.username} checked_in={invitation.checked_in}")
+
+    return JsonResponse(payload)
+
+
+@require_POST
+def recaptcha_enterprise_verify(request):
+    """Verify a reCAPTCHA Enterprise token posted from the client.
+
+    Expects JSON body: { "token": "...", "action": "<ACTION>" }
+    Returns JSON: { success, valid, riskScore, action_mismatch, tokenProperties }
+    """
+    if not RECAPTCHA_ENTERPRISE_AVAILABLE:
+        return JsonResponse({'success': False, 'message': 'recaptcha enterprise client not available'}, status=500)
+
+    try:
+        data = json.loads(request.body.decode('utf-8'))
+    except Exception:
+        return JsonResponse({'success': False, 'message': 'Invalid JSON'}, status=400)
+
+    token = data.get('token')
+    action = data.get('action', '')
+    if not token:
+        return JsonResponse({'success': False, 'message': 'Missing token'}, status=400)
+
+    # Load credentials if a service account path is provided via env
+    credentials = None
+    sa_path = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
+    if sa_path and os.path.exists(sa_path):
+        try:
+            credentials = service_account.Credentials.from_service_account_file(sa_path)
+        except Exception:
+            logger.exception('Failed to load service account credentials from %s', sa_path)
+
+    client = recaptchaenterprise_v1.RecaptchaEnterpriseServiceClient(credentials=credentials)
+
+    project_id = os.environ.get('RECAPTCHA_ENTERPRISE_PROJECT')
+    site_key = os.environ.get('RECAPTCHA_ENTERPRISE_SITE_KEY')
+    if not project_id or not site_key:
+        return JsonResponse({'success': False, 'message': 'Server not configured for reCAPTCHA Enterprise'}, status=500)
+
+    event = recaptchaenterprise_v1.Event()
+    event.site_key = site_key
+    event.token = token
+
+    assessment = recaptchaenterprise_v1.Assessment()
+    assessment.event = event
+
+    parent = f"projects/{project_id}"
+    request_proto = recaptchaenterprise_v1.CreateAssessmentRequest()
+    request_proto.parent = parent
+    request_proto.assessment = assessment
+
+    try:
+        resp = client.create_assessment(request=request_proto)
+    except Exception as e:
+        logger.exception('reCAPTCHA Enterprise create_assessment failed')
+        return JsonResponse({'success': False, 'message': str(e)}, status=500)
+
+    # Token validity
+    if not getattr(resp.token_properties, 'valid', False):
+        return JsonResponse({'success': False, 'valid': False, 'invalid_reason': getattr(resp.token_properties, 'invalid_reason', None)}, status=400)
+
+    action_mismatch = False
+    if action and getattr(resp.token_properties, 'action', None) != action:
+        action_mismatch = True
+
+    score = None
+    if resp.risk_analysis and getattr(resp.risk_analysis, 'score', None) is not None:
+        score = resp.risk_analysis.score
+
+    return JsonResponse({
+        'success': True,
+        'valid': True,
+        'riskScore': score,
+        'action_mismatch': action_mismatch,
+        'tokenProperties': {
+            'valid': resp.token_properties.valid,
+            'action': getattr(resp.token_properties, 'action', None),
+        }
     })
 
 @login_required
@@ -357,6 +641,93 @@ def check_in_guest(request, code):
     return render(request, 'guests/check_in_confirm.html', {
         'invitation': invitation
     })
+
+
+@require_POST
+@login_required
+def start_checkin_session(request):
+    """Start a check-in session for an event. Uses cache to publish active session state shared between ushers."""
+    if not (request.user.is_staff or request.user.is_superuser):
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied
+    try:
+        data = json.loads(request.body.decode('utf-8'))
+    except Exception:
+        data = request.POST
+    event_id = data.get('event_id')
+    if not event_id:
+        return JsonResponse({'status': 'error', 'message': 'event_id required'}, status=400)
+    try:
+        ev = Event.objects.get(id=event_id)
+    except Event.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': 'Event not found'}, status=404)
+
+    session_key = f'guests:checkin_session:{event_id}'
+    # Prevent starting a second active session for the same event
+    active_db = CheckInSession.objects.filter(event=ev, ended_at__isnull=True).first()
+    if active_db:
+        return JsonResponse({'status': 'error', 'message': 'A session is already active for this event.'}, status=409)
+
+    session_data = {
+        'event_id': int(event_id),
+        'event_name': ev.name,
+        'started_by': request.user.username,
+        'started_at': timezone.now().isoformat()
+    }
+    # Store in cache (shared cache recommended) with configured timeout
+    cache.set(session_key, session_data, timeout=getattr(settings, 'CHECKIN_SESSION_TIMEOUT', 60 * 60 * 8))
+
+    # Persist audit record
+    try:
+        sess = CheckInSession.objects.create(event=ev, started_by=request.user)
+        session_data['session_id'] = sess.id
+    except Exception:
+        logger.exception('Failed to create CheckInSession record')
+
+    return JsonResponse({'status': 'ok', 'session': session_data})
+
+
+@require_POST
+@login_required
+def end_checkin_session(request):
+    if not (request.user.is_staff or request.user.is_superuser):
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied
+    try:
+        data = json.loads(request.body.decode('utf-8'))
+    except Exception:
+        data = request.POST
+    event_id = data.get('event_id')
+    if not event_id:
+        return JsonResponse({'status': 'error', 'message': 'event_id required'}, status=400)
+    session_key = f'guests:checkin_session:{event_id}'
+    # Delete cache key
+    cache.delete(session_key)
+
+    # Update DB audit record if present (mark ended)
+    try:
+        active = CheckInSession.objects.filter(event_id=event_id, ended_at__isnull=True).order_by('-started_at').first()
+        if active:
+            active.ended_at = timezone.now()
+            active.ended_by = request.user
+            active.save(update_fields=['ended_at', 'ended_by'])
+    except Exception:
+        logger.exception('Failed to mark CheckInSession ended in DB')
+
+    return JsonResponse({'status': 'ok'})
+
+
+@login_required
+def active_checkin_sessions(request):
+    """Return active check-in sessions (best-effort). Since cache doesn't list keys portably, accept event_id param or return empty list."""
+    event_id = request.GET.get('event_id')
+    if event_id:
+        session = cache.get(f'guests:checkin_session:{event_id}')
+        if not session:
+            return JsonResponse({'status': 'ok', 'active': False, 'session': None})
+        return JsonResponse({'status': 'ok', 'active': True, 'session': session})
+    # Without event_id we can't reliably enumerate cache keys in portable way; client should request per-event
+    return JsonResponse({'status': 'ok', 'active': False, 'session': None})
 
 @login_required
 def guest_info(request, code):

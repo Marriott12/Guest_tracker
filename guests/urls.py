@@ -37,6 +37,13 @@ urlpatterns = [
     
     # Barcode scanning and guest check-in
     path('scan/', views.scan_barcode, name='scan_barcode'),
+    path('scanner/', views.scanner_ui, name='scanner_ui'),
+    path('api/check-in/', views.api_check_in, name='api_check_in'),
+    path('api/check-in-session/start/', views.start_checkin_session, name='start_checkin_session'),
+    path('api/check-in-session/end/', views.end_checkin_session, name='end_checkin_session'),
+    path('api/check-in-session/active/', views.active_checkin_sessions, name='active_checkin_sessions'),
+    path('recaptcha/verify/', views.recaptcha_enterprise_verify, name='recaptcha_enterprise_verify'),
+    path('event/<int:event_id>/checkin-summary-json/', views.checkin_summary_json, name='checkin_summary_json'),
     path('guest/<uuid:code>/', views.guest_info, name='guest_info'),
     path('check-in/<uuid:code>/', views.check_in_guest, name='check_in_guest'),
     

@@ -1,0 +1,104 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Seating Assignment - {{ event.name }}</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    .table { display: inline-block; vertical-align: top; margin: 10px; border: 1px solid #ddd; padding: 8px; width:260px }
+    .table h3 { margin: 0 0 8px 0; }
+    .seat { display: block; margin: 4px 0; padding:6px; border:1px dashed #ccc; min-height:30px; background:#fafafa }
+    .guest-list { display:inline-block; vertical-align: top; width:300px; margin-right:18px }
+    .guest { padding:6px; margin:4px 0; background:#eee; border-radius:4px; cursor:grab }
+    .controls { clear:both; margin-top:20px }
+    .btn { padding: 6px 12px; background:#007bff; color:white; text-decoration:none; border-radius:4px }
+  </style>
+  <script src="{% static 'guests/js/sortable.min.js' %}"></script>
+</head>
+<body>
+  <h1>Seating Assignment for {{ event.name }}</h1>
+  <p>Drag guests from the left list onto seat slots. Click Save to persist assignments.</p>
+  <form method="post">
+    {% csrf_token %}
+    <div class="guest-list">
+      <h3>Guests</h3>
+      <div id="guestPool">
+        {% for inv in invitations %}
+          <div class="guest" data-inv-id="{{ inv.id }}">{{ inv.guest.full_name }} &lt;{{ inv.guest.email }}&gt;</div>
+        {% endfor %}
+      </div>
+    </div>
+    <div>
+      {% for table in tables %}
+        <div class="table" data-table-number="{{ table.number }}">
+          <h3>Table {{ table.number }} (Capacity: {{ table.capacity }})</h3>
+          {% for seat in table.seats.all %}
+            <div class="seat" data-seat-id="{{ seat.id }}">
+              <div>Seat {{ seat.number }}:</div>
+              <div class="seat-dropzone" id="seat-zone-{{ seat.id }}" data-seat-id="{{ seat.id }}">
+                {% if seat.assigned_invitation %}
+                  <div class="guest" data-inv-id="{{ seat.assigned_invitation.id }}">{{ seat.assigned_invitation.guest.full_name }} &lt;{{ seat.assigned_invitation.guest.email }}&gt;</div>
+                {% else %}
+                  <div class="empty">-- unassigned --</div>
+                {% endif %}
+              </div>
+              <input type="hidden" name="seat_{{ seat.id }}" id="seat_input_{{ seat.id }}" value="{% if seat.assigned_invitation %}{{ seat.assigned_invitation.id }}{% endif %}" />
+            </div>
+          {% endfor %}
+        </div>
+      {% endfor %}
+    </div>
+    <div style="clear:both;margin-top:20px;">
+      <button class="btn" type="submit" name="action" value="save">Save Assignments</button>
+      <button class="btn" type="submit" name="action" value="auto_assign">Auto-assign Remaining</button>
+      <button class="btn" type="submit" name="action" value="export">Export CSV</button>
+      <a class="btn" href="{{ admin_event_url }}">Back to Event</a>
+    </div>
+  </form>
+  <script>
+    // Make guests draggable and seat dropzones droppable using Sortable
+    function makeSortable() {
+      // guest pool
+      Sortable.create(document.getElementById('guestPool'), {
+        group: 'shared',
+        animation: 150,
+        sort: true
+      });
+
+      // seat dropzones
+      document.querySelectorAll('.seat-dropzone').forEach(function(zone){
+        Sortable.create(zone, {
+          group: 'shared',
+          animation: 150,
+          sort: false,
+          onAdd: function (evt) {
+            var item = evt.item;
+            var invId = item.getAttribute('data-inv-id');
+            var seatId = zone.getAttribute('data-seat-id');
+            // set hidden input value
+            var input = document.getElementById('seat_input_' + seatId);
+            if (input) input.value = invId;
+            // remove placeholder empty
+            var empty = zone.querySelector('.empty'); if (empty) empty.remove();
+          },
+          onRemove: function(evt) {
+            var zone = evt.from;
+            var seatId = zone.getAttribute('data-seat-id');
+            if (seatId) {
+              var input = document.getElementById('seat_input_' + seatId);
+              if (input) input.value = '';
+              // add placeholder back if empty
+              if (!zone.querySelector('.guest')) {
+                var d = document.createElement('div'); d.className='empty'; d.innerText='-- unassigned --'; zone.appendChild(d);
+              }
+            }
+          }
+        });
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', function(){ makeSortable(); });
+  </script>
+</body>
+</html>

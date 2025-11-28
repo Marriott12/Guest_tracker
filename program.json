@@ -1,0 +1,9 @@
+{
+  "items": [
+    {"time": "10:00 AM", "activity": "Opening Ceremony", "description": "Welcome speech and introductions"},
+    {"time": "10:30 AM", "activity": "Keynote", "description": "Keynote address by guest speaker"},
+    {"time": "11:15 AM", "activity": "Break", "description": "Coffee and networking"},
+    {"time": "11:30 AM", "activity": "Panel Discussion", "description": "Discussion on event topic"},
+    {"time": "12:30 PM", "activity": "Lunch", "description": "Buffet served in dining hall"}
+  ]
+}

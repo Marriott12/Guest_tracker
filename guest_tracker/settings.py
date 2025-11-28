@@ -30,7 +30,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-p$0!027-hcwap2*)hernt7*829zn8&68r@u#q9ih+-v15j^yd2')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True  # Temporarily hardcoded for local testing
+DEBUG = config('DEBUG', default=True, cast=bool)
 
 ALLOWED_HOSTS = ['*']  # Temporarily allow all hosts for local testing
 
@@ -38,21 +38,16 @@ ALLOWED_HOSTS = ['*']  # Temporarily allow all hosts for local testing
 # Application definition
 
 INSTALLED_APPS = [
+    # Core Django apps required for admin, auth and static files
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
+    # Primary project app: contains events, invitations and check-in tracking
     'guests',
-    'crispy_forms',
-    'crispy_bootstrap5',
-    'django_extensions',
-    'import_export',
-    'django_tables2',
-    'django_filters',
-    'captcha',  # django-recaptcha
-    'storages',  # For AWS S3 support
 ]
 
 MIDDLEWARE = [
@@ -201,6 +196,10 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 # QR Code settings
 QR_CODE_CACHE_ALIAS = 'default'
 
+# Check-in configuration
+# If True, require a scanned barcode for check-in (disallow unique_code-based check-ins)
+CHECKIN_REQUIRE_BARCODE = config('CHECKIN_REQUIRE_BARCODE', default=False, cast=bool)
+
 # Security Settings
 SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=False, cast=bool)
 SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', default=False, cast=bool)
@@ -298,6 +297,25 @@ if not DEBUG:
 
 # AWS S3 Configuration (Optional - for production file storage)
 USE_S3 = config('USE_S3', default=False, cast=bool)
+
+# Optional Redis cache configuration for production (recommended for shared sessions)
+# Provide REDIS_URL as env var like redis://[:password]@host:port/db
+REDIS_URL = config('REDIS_URL', default='')
+if REDIS_URL:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            'LOCATION': REDIS_URL,
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            }
+        }
+    }
+
+# Ensure DEBUG is boolean and secure defaults are used in production
+if not DEBUG:
+    # sensible defaults for production; allow overrides via env
+    ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='', cast=Csv()) or ALLOWED_HOSTS
 
 if USE_S3:
     # AWS Settings

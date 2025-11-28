@@ -45,6 +45,22 @@
                 <a href="{{ rsvp_url }}" class="cta-button">RSVP Now</a>
             </div>
             
+            {% if qr_cid or barcode_cid %}
+            <div class="event-details" style="text-align:center;">
+                {% if qr_cid %}
+                <p><strong>QR Code for RSVP:</strong></p>
+                <img src="cid:{{ qr_cid }}" alt="QR code for RSVP" style="max-width:200px;height:auto;border:1px solid #ddd;padding:5px;border-radius:4px;" />
+                {% endif %}
+
+                {% if barcode_cid %}
+                <p style="margin-top:10px;"><strong>Barcode for Check-in:</strong></p>
+                <img src="cid:{{ barcode_cid }}" alt="Barcode for check-in" style="max-width:300px;height:auto;border:1px solid #ddd;padding:5px;border-radius:4px;" />
+                {% endif %}
+
+                <p style="font-size:12px;color:#666;margin-top:10px;">If images are not visible, the QR code and barcode are attached to this email.</p>
+            </div>
+            {% endif %}
+            
             <p>Please click the button above to let us know if you can attend. You can also specify any dietary restrictions or special requests.</p>
             
             <p>We look forward to celebrating with you!</p>

@@ -1,0 +1,83 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Import CSV - {{ event.name }}</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    textarea { width: 100%; height: 180px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 12px }
+    th, td { border: 1px solid #ddd; padding: 6px }
+    .btn { padding: 6px 12px; background:#007bff; color:white; text-decoration:none; border-radius:4px }
+    .error { color: red }
+  </style>
+</head>
+<body>
+  <h1>Import CSV for {{ event.name }}</h1>
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <label>Import Type</label>
+    <select name="import_type">
+      <option value="program">Program (time,activity,description)</option>
+      <option value="menu">Menu (name,description,dietary_tags)</option>
+      <option value="tables">Tables (table_number,capacity,section)</option>
+      <option value="seating">Seating assignments (table_number,seat_number,guest_identifier)</option>
+    </select>
+    <div style="margin-top:10px">
+      <label>Upload CSV file</label>
+      <input type="file" name="csv_file" accept=".csv" />
+      <span style="margin-left:10px">or paste text below:</span>
+    </div>
+    <div style="margin-top:10px">
+      <label>Paste CSV / text</label>
+      <textarea name="textarea_data" placeholder="time,activity,description\n10:00 AM,Opening Ceremony,Welcome speech"></textarea>
+    </div>
+    <div style="margin-top:8px">
+      <strong>Sample CSVs:</strong>
+      <ul>
+        <li><a href="{% static 'guests/samples/program_sample.csv' %}">Program sample</a></li>
+        <li><a href="{% static 'guests/samples/menu_sample.csv' %}">Menu sample</a></li>
+        <li><a href="{% static 'guests/samples/tables_sample.csv' %}">Tables sample</a></li>
+        <li><a href="{% static 'guests/samples/seating_sample.csv' %}">Seating sample</a></li>
+      </ul>
+    </div>
+    <div style="margin-top:10px">
+      <button class="btn" type="submit" name="action" value="preview">Preview</button>
+      <button class="btn" type="submit" name="action" value="apply">Apply Import</button>
+      <a class="btn" href="{{ admin_event_url }}">Back to Event</a>
+    </div>
+  </form>
+
+  {% if errors %}
+    <h3 class="error">Errors</h3>
+    <ul>
+      {% for e in errors %}
+        <li>{{ e }}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+  {% if parsed and preview %}
+    <h2>Preview Parsed Rows</h2>
+    <table>
+      <thead>
+        <tr>
+          {% for key in parsed.0.keys %}
+            <th>{{ key }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in parsed %}
+          <tr>
+            {% for v in row.values %}
+              <td>{{ v }}</td>
+            {% endfor %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</body>
+</html>
