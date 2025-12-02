@@ -1,6 +1,7 @@
 from django.urls import path
 from . import views
 from . import analytics_views
+from . import export_views
 
 urlpatterns = [
     # Home page
@@ -14,6 +15,14 @@ urlpatterns = [
     
     # Analytics dashboard
     path('analytics/', analytics_views.analytics_dashboard, name='analytics_dashboard'),
+    path('event/<int:event_id>/analytics/checkins/', analytics_views.checkin_analytics, name='checkin_analytics'),
+    
+    # Export URLs
+    path('event/<int:event_id>/export/guests/csv/', export_views.export_guest_list_csv, name='export_guest_list_csv'),
+    path('event/<int:event_id>/export/guests/excel/', export_views.export_guest_list_excel, name='export_guest_list_excel'),
+    path('event/<int:event_id>/export/checkin/csv/', export_views.export_checkin_log_csv, name='export_checkin_log_csv'),
+    path('event/<int:event_id>/export/rsvp/csv/', export_views.export_rsvp_report_csv, name='export_rsvp_report_csv'),
+    path('event/<int:event_id>/export/seating/pdf/', export_views.export_seating_chart_pdf, name='export_seating_chart_pdf'),
     
     # RSVP URLs
     path('rsvp/<uuid:code>/', views.rsvp_response, name='rsvp'),
@@ -38,7 +47,9 @@ urlpatterns = [
     # Barcode scanning and guest check-in
     path('scan/', views.scan_barcode, name='scan_barcode'),
     path('scanner/', views.scanner_ui, name='scanner_ui'),
+    path('mobile-scanner/', views.mobile_scanner, name='mobile_scanner'),
     path('api/check-in/', views.api_check_in, name='api_check_in'),
+    path('api/recent-checkins/', views.api_recent_checkins, name='api_recent_checkins'),
     path('api/check-in-session/start/', views.start_checkin_session, name='start_checkin_session'),
     path('api/check-in-session/end/', views.end_checkin_session, name='end_checkin_session'),
     path('api/check-in-session/active/', views.active_checkin_sessions, name='active_checkin_sessions'),
@@ -56,4 +67,15 @@ urlpatterns = [
     
     # User Profile URLs
     path('profile/edit/', views.user_profile_edit, name='user_profile_edit'),
+    
+    # Export URLs
+    path('event/<int:event_id>/export/guests/csv/', export_views.export_guest_list_csv, name='export_guest_list_csv'),
+    path('event/<int:event_id>/export/guests/excel/', export_views.export_guest_list_excel, name='export_guest_list_excel'),
+    path('event/<int:event_id>/export/checkin/csv/', export_views.export_checkin_log_csv, name='export_checkin_log_csv'),
+    path('event/<int:event_id>/export/rsvp/csv/', export_views.export_rsvp_report_csv, name='export_rsvp_report_csv'),
+    path('event/<int:event_id>/export/seating/pdf/', export_views.export_seating_chart_pdf, name='export_seating_chart_pdf'),
+    
+    # Live Dashboard URLs
+    path('live-checkin/', views.live_checkin_dashboard, name='live_checkin_dashboard'),
+    path('api/live-checkin-data/', views.live_checkin_data_api, name='live_checkin_data_api'),
 ]

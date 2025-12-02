@@ -40,8 +40,40 @@ class EventTemplate(models.Model):
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='event_templates')
     created_at = models.DateTimeField(auto_now_add=True)
     
+    # Template settings
+    dress_code = models.CharField(max_length=200, blank=True)
+    parking_info = models.TextField(blank=True)
+    special_instructions = models.TextField(blank=True)
+    program_schedule = models.JSONField(default=dict, blank=True)
+    menu = models.JSONField(default=dict, blank=True)
+    has_assigned_seating = models.BooleanField(default=False)
+    
     def __str__(self):
         return self.name
+    
+    def create_event_from_template(self, user, event_date, event_name=None):
+        """Create a new event using this template"""
+        from datetime import timedelta
+        
+        rsvp_deadline = event_date - timedelta(days=self.default_rsvp_deadline_days)
+        
+        event = Event.objects.create(
+            name=event_name or self.name,
+            description=self.description,
+            date=event_date,
+            location=self.default_location,
+            created_by=user,
+            rsvp_deadline=rsvp_deadline,
+            max_guests=self.default_max_guests,
+            dress_code=self.dress_code,
+            parking_info=self.parking_info,
+            special_instructions=self.special_instructions,
+            program_schedule=self.program_schedule.copy() if self.program_schedule else {},
+            menu=self.menu.copy() if self.menu else {},
+            has_assigned_seating=self.has_assigned_seating,
+        )
+        
+        return event
 
 class Event(models.Model):
     """Model for events/occasions"""
@@ -156,6 +188,9 @@ class Guest(models.Model):
     rank = models.CharField(max_length=100, blank=True, help_text="Military or professional rank/title")
     institution = models.CharField(max_length=200, blank=True, help_text="Institution or unit (e.g., Army Division)")
     
+    # Guest photo
+    photo = models.ImageField(upload_to='guest_photos/', blank=True, null=True, help_text="Guest profile photo")
+    
     # Guest portal settings
     can_login = models.BooleanField(default=False, help_text="Allow this guest to login to the portal")
     last_login = models.DateTimeField(null=True, blank=True)
@@ -260,8 +295,18 @@ class Invitation(models.Model):
             border=4,
         )
         
-        # Create the RSVP URL
-        rsvp_url = f"http://localhost:8000/rsvp/{self.unique_code}/"
+        # Create the RSVP URL - use Django's get_current_site or fallback to localhost
+        from django.contrib.sites.models import Site
+        try:
+            current_site = Site.objects.get_current()
+            domain = current_site.domain
+        except:
+            domain = getattr(settings, 'ALLOWED_HOSTS', ['localhost'])[0]
+            if domain == '*':
+                domain = 'localhost:8000'
+        
+        protocol = 'https' if getattr(settings, 'SECURE_SSL_REDIRECT', False) else 'http'
+        rsvp_url = f"{protocol}://{domain}/rsvp/{self.unique_code}/"
         qr.add_data(rsvp_url)
         qr.make(fit=True)
 

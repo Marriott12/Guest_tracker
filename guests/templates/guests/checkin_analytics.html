@@ -1,0 +1,156 @@
+{% extends "guests/base.html" %}
+{% load static %}
+
+{% block title %}Check-in Analytics - {{ event.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2><i class="fas fa-chart-line me-2"></i>Check-in Analytics: {{ event.name }}</h2>
+            <p class="text-muted">{{ event.date|date:"F d, Y" }} at {{ event.venue }}</p>
+        </div>
+    </div>
+
+    <!-- Key Metrics -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">Total Invitations</h5>
+                    <h2 class="text-primary">{{ total_invitations }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">Checked In</h5>
+                    <h2 class="text-success">{{ total_checkins }}</h2>
+                    <small class="text-muted">{{ checkin_rate }}%</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">Expected (RSVP Yes)</h5>
+                    <h2 class="text-warning">{{ rsvp_yes }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">Attendance Rate</h5>
+                    <h2 class="text-info">{{ attendance_fulfillment }}%</h2>
+                    <small class="text-muted">of RSVP Yes</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="row">
+        {% if charts.checkin_status %}
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    {{ charts.checkin_status|safe }}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if charts.rsvp_vs_actual %}
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    {{ charts.rsvp_vs_actual|safe }}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if charts.hourly_pattern %}
+        <div class="col-12 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    {{ charts.hourly_pattern|safe }}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if charts.table_distribution %}
+        <div class="col-12 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    {{ charts.table_distribution|safe }}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if charts.daily_trend %}
+        <div class="col-12 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    {{ charts.daily_trend|safe }}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Recent Check-ins Table -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Recent Check-ins (Last 50)</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Guest Name</th>
+                                    <th>Time</th>
+                                    <th>Table</th>
+                                    <th>Seat</th>
+                                    <th>Checked By</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for log in checkin_logs %}
+                                <tr>
+                                    <td>{{ log.guest.full_name }}</td>
+                                    <td>{{ log.checked_in_at|date:"M d, Y g:i A" }}</td>
+                                    <td>{{ log.table_number|default:"—" }}</td>
+                                    <td>{{ log.seat_number|default:"—" }}</td>
+                                    <td>{{ log.checked_in_by.username|default:"System" }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted">No check-ins yet</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-4 mb-4">
+        <a href="{% url 'event_dashboard' event.id %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>Back to Event Dashboard
+        </a>
+        <a href="{% url 'export_checkin_log_csv' event.id %}" class="btn btn-success">
+            <i class="fas fa-download me-1"></i>Export Check-in Data
+        </a>
+    </div>
+</div>
+{% endblock %}

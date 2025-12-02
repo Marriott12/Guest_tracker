@@ -334,7 +334,7 @@ def add_guest(request, event_id=None):
         event = get_object_or_404(Event, id=event_id, created_by=request.user)
     
     if request.method == 'POST':
-        form = GuestForm(request.POST)
+        form = GuestForm(request.POST, request.FILES)
         if form.is_valid():
             guest = form.save()
             
@@ -417,6 +417,27 @@ def scan_barcode(request):
     invitation = None
     error_message = None
     
+    # Get upcoming events for event selection
+    upcoming_events = Event.objects.filter(
+        date__gte=timezone.now()
+    ).order_by('date')[:50]
+    
+    # Get event_id from URL parameter if present
+    initial_event_id = request.GET.get('event_id')
+
+def mobile_scanner(request):
+    """Mobile-optimized scanner with camera support"""
+    upcoming_events = Event.objects.filter(
+        date__gte=timezone.now()
+    ).order_by('date')[:50]
+    
+    initial_event_id = request.GET.get('event_id')
+    
+    return render(request, 'guests/mobile_scanner.html', {
+        'events': upcoming_events,
+        'initial_event_id': initial_event_id
+    })
+    
     if request.method == 'POST':
         barcode_number = request.POST.get('barcode_number', '').strip()
         event_id = request.POST.get('event_id') or request.GET.get('event_id')
@@ -432,7 +453,9 @@ def scan_barcode(request):
     
     return render(request, 'guests/scan_barcode.html', {
         'invitation': invitation,
-        'error_message': error_message
+        'error_message': error_message,
+        'events': upcoming_events,
+        'initial_event_id': initial_event_id,
     })
 
 
@@ -448,6 +471,35 @@ def scanner_ui(request):
     return render(request, 'guests/scanner_ui.html', {'events': list(events)})
 
 
+@login_required
+def api_recent_checkins(request):
+    """API endpoint to get recent check-ins for an event with undo capability"""
+    if not (request.user.is_staff or request.user.is_superuser):
+        return JsonResponse({'status': 'forbidden', 'message': 'Not authorized'}, status=403)
+    
+    event_id = request.GET.get('event_id')
+    limit = int(request.GET.get('limit', 20))
+    
+    if not event_id:
+        return JsonResponse({'status': 'error', 'message': 'event_id required'}, status=400)
+    
+    recent_checkins = Invitation.objects.filter(
+        event_id=event_id,
+        checked_in=True
+    ).select_related('guest').order_by('-check_in_time')[:limit]
+    
+    data = [{
+        'id': inv.id,
+        'guest_name': inv.guest.full_name,
+        'barcode': inv.barcode_number,
+        'check_in_time': inv.check_in_time.isoformat() if inv.check_in_time else None,
+        'table_number': inv.table_number or '',
+        'seat_number': inv.seat_number or ''
+    } for inv in recent_checkins]
+    
+    return JsonResponse({'success': True, 'checkins': data})
+
+
 @require_POST
 @ratelimit(key='user', rate='60/h', method='POST', block=True)
 @login_required
@@ -460,6 +512,7 @@ def api_check_in(request):
     Optional fields:
       - check_in: boolean (if true, perform check-in)
       - table_number, seat_number: strings to assign seating
+      - undo: boolean (if true, undo the check-in)
 
     Returns JSON with invitation and guest info or an error message.
     """
@@ -480,6 +533,7 @@ def api_check_in(request):
     unique_code = data.get('unique_code')
     event_id = data.get('event_id') or data.get('event')
     do_check = data.get('check_in') in [True, 'true', 'True', '1', 1]
+    do_undo = data.get('undo') in [True, 'true', 'True', '1', 1]
     table = data.get('table_number')
     seat = data.get('seat_number')
 
@@ -517,6 +571,24 @@ def api_check_in(request):
             return JsonResponse({'status': 'not_found', 'message': f'No invitation found for code {unique_code}'}, status=404)
     else:
         return JsonResponse({'status': 'error', 'message': 'No identifier provided (barcode_number or unique_code required).'}, status=400)
+
+    # Handle undo operation
+    if do_undo:
+        if invitation.checked_in:
+            invitation.checked_in = False
+            invitation.check_in_time = None
+            invitation.table_number = ''
+            invitation.seat_number = ''
+            invitation.save()
+            logger.info(f"Check-in undone for {invitation.guest.full_name} by {request.user.username}")
+            return JsonResponse({
+                'success': True,
+                'message': f'Check-in undone for {invitation.guest.full_name}',
+                'guest_name': invitation.guest.full_name,
+                'checked_in': False
+            })
+        else:
+            return JsonResponse({'status': 'error', 'message': 'Guest is not checked in.'}, status=400)
 
     # Only assign seating when performing check-in.
     if do_check:
@@ -1008,3 +1080,76 @@ def guest_invitation_detail(request, invitation_id):
     }
     
     return render(request, 'guests/guest_invitation_detail.html', context)
+
+
+@login_required
+def live_checkin_dashboard(request):
+    """Live check-in dashboard with real-time updates"""
+    return render(request, 'guests/live_checkin_dashboard.html')
+
+
+@login_required
+def live_checkin_data_api(request):
+    """API endpoint for live check-in dashboard data"""
+    from datetime import timedelta
+    from django.db.models import Count
+    from django.db.models.functions import TruncMinute
+    
+    # Get all checked-in invitations from today
+    today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    checked_in_invitations = Invitation.objects.filter(
+        checked_in=True,
+        check_in_time__gte=today_start
+    ).select_related('guest', 'event')
+    
+    # Calculate stats
+    total_checked_in = checked_in_invitations.count()
+    total_expected = Invitation.objects.filter(
+        event__date__gte=today_start,
+        event__date__lte=timezone.now() + timedelta(days=1)
+    ).count()
+    
+    # Calculate arrival rate (last 5 minutes)
+    five_minutes_ago = timezone.now() - timedelta(minutes=5)
+    arrival_rate = checked_in_invitations.filter(check_in_time__gte=five_minutes_ago).count()
+    
+    # Calculate percentage
+    percentage_checked_in = round((total_checked_in / total_expected * 100) if total_expected > 0 else 0, 1)
+    
+    # Timeline data (last 60 minutes, grouped by 5-minute intervals)
+    sixty_minutes_ago = timezone.now() - timedelta(minutes=60)
+    timeline_data = []
+    timeline_labels = []
+    
+    for i in range(12):  # 12 intervals of 5 minutes
+        interval_start = sixty_minutes_ago + timedelta(minutes=i*5)
+        interval_end = interval_start + timedelta(minutes=5)
+        count = checked_in_invitations.filter(
+            check_in_time__gte=interval_start,
+            check_in_time__lt=interval_end
+        ).count()
+        timeline_data.append(count)
+        timeline_labels.append(interval_start.strftime('%H:%M'))
+    
+    # Recent check-ins (last 10)
+    recent_checkins = []
+    for invitation in checked_in_invitations.order_by('-check_in_time')[:10]:
+        recent_checkins.append({
+            'time': invitation.check_in_time.strftime('%H:%M:%S') if invitation.check_in_time else '',
+            'guest_name': invitation.guest.full_name,
+            'rank': invitation.guest.rank or '',
+            'event_name': invitation.event.name,
+            'table_number': invitation.table_number or ''
+        })
+    
+    return JsonResponse({
+        'total_checked_in': total_checked_in,
+        'total_expected': total_expected,
+        'arrival_rate': arrival_rate,
+        'percentage_checked_in': percentage_checked_in,
+        'timeline_labels': timeline_labels,
+        'timeline_data': timeline_data,
+        'recent_checkins': recent_checkins
+    })
+

@@ -1,0 +1,397 @@
+{% extends "guests/base.html" %}
+{% load static %}
+
+{% block title %}Mobile Scanner{% endblock %}
+
+{% block extra_css %}
+<style>
+  .mobile-scanner-container {
+    max-width: 100%;
+    padding: 0;
+  }
+  
+  #video-container {
+    position: relative;
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
+    background: #000;
+  }
+  
+  #camera-video {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+  
+  #camera-canvas {
+    display: none;
+  }
+  
+  .camera-controls {
+    text-align: center;
+    padding: 1rem;
+    background: #f8f9fa;
+  }
+  
+  .scan-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80%;
+    height: 60%;
+    border: 3px solid #00ff00;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+    pointer-events: none;
+  }
+  
+  .scan-line {
+    position: absolute;
+    width: 100%;
+    height: 2px;
+    background: #00ff00;
+    animation: scan 2s linear infinite;
+  }
+  
+  @keyframes scan {
+    0%, 100% { top: 0; }
+    50% { top: 100%; }
+  }
+  
+  .check-in-status {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    border-top: 2px solid #dee2e6;
+    padding: 1rem;
+    max-height: 50vh;
+    overflow-y: auto;
+  }
+  
+  .status-item {
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+    border-radius: 0.25rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .status-success {
+    background: #d4edda;
+    border-left: 4px solid #28a745;
+  }
+  
+  .status-error {
+    background: #f8d7da;
+    border-left: 4px solid #dc3545;
+  }
+  
+  .status-offline {
+    background: #fff3cd;
+    border-left: 4px solid #ffc107;
+  }
+  
+  .offline-badge {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    background: #ffc107;
+    color: #000;
+    padding: 0.5rem 1rem;
+    border-radius: 2rem;
+    font-weight: bold;
+    z-index: 1000;
+    display: none;
+  }
+  
+  .offline-badge.show {
+    display: block;
+  }
+  
+  @media (max-width: 768px) {
+    .mobile-scanner-container {
+      padding: 0;
+    }
+    
+    .camera-controls button {
+      width: 100%;
+      margin: 0.25rem 0;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mobile-scanner-container">
+  <div class="offline-badge" id="offlineBadge">
+    <i class="fas fa-wifi-slash"></i> Offline Mode
+  </div>
+  
+  <div class="card mb-3">
+    <div class="card-header bg-primary text-white">
+      <h5 class="mb-0">
+        <i class="fas fa-mobile-alt"></i> Mobile Scanner
+        <span id="eventName" class="float-end small"></span>
+      </h5>
+    </div>
+    <div class="card-body p-0">
+      <div id="video-container">
+        <video id="camera-video" autoplay playsinline></video>
+        <canvas id="camera-canvas"></canvas>
+        <div class="scan-overlay">
+          <div class="scan-line"></div>
+        </div>
+      </div>
+      
+      <div class="camera-controls">
+        <button type="button" id="startCamera" class="btn btn-success">
+          <i class="fas fa-camera"></i> Start Camera
+        </button>
+        <button type="button" id="stopCamera" class="btn btn-danger" style="display: none;">
+          <i class="fas fa-stop"></i> Stop Camera
+        </button>
+        <button type="button" id="switchCamera" class="btn btn-secondary" style="display: none;">
+          <i class="fas fa-sync-alt"></i> Switch Camera
+        </button>
+        <button type="button" id="toggleFlash" class="btn btn-warning" style="display: none;">
+          <i class="fas fa-lightbulb"></i> Flash
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  <div class="check-in-status" id="statusContainer">
+    <h6>Recent Scans</h6>
+    <div id="statusList"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<script>
+  const video = document.getElementById('camera-video');
+  const canvas = document.getElementById('camera-canvas');
+  const ctx = canvas.getContext('2d');
+  const startBtn = document.getElementById('startCamera');
+  const stopBtn = document.getElementById('stopCamera');
+  const switchBtn = document.getElementById('switchCamera');
+  const flashBtn = document.getElementById('toggleFlash');
+  const statusList = document.getElementById('statusList');
+  const offlineBadge = document.getElementById('offlineBadge');
+  
+  let currentStream = null;
+  let currentFacingMode = 'environment';
+  let scanning = false;
+  let lastScannedCode = null;
+  let lastScanTime = 0;
+  let eventId = {{ initial_event_id|default:"null" }};
+  
+  // Check online/offline status
+  function updateOnlineStatus() {
+    if (navigator.onLine) {
+      offlineBadge.classList.remove('show');
+      syncOfflineCheckIns();
+    } else {
+      offlineBadge.classList.add('show');
+    }
+  }
+  
+  window.addEventListener('online', updateOnlineStatus);
+  window.addEventListener('offline', updateOnlineStatus);
+  updateOnlineStatus();
+  
+  // Register service worker for offline support
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/static/guests/js/service-worker.js')
+      .then(reg => console.log('Service Worker registered'))
+      .catch(err => console.error('Service Worker registration failed:', err));
+  }
+  
+  // Start camera
+  startBtn.addEventListener('click', async () => {
+    try {
+      currentStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: currentFacingMode },
+        audio: false
+      });
+      
+      video.srcObject = currentStream;
+      video.play();
+      
+      startBtn.style.display = 'none';
+      stopBtn.style.display = 'inline-block';
+      switchBtn.style.display = 'inline-block';
+      
+      // Check for flash support
+      const track = currentStream.getVideoTracks()[0];
+      const capabilities = track.getCapabilities();
+      if (capabilities.torch) {
+        flashBtn.style.display = 'inline-block';
+      }
+      
+      scanning = true;
+      requestAnimationFrame(scanFrame);
+    } catch (err) {
+      alert('Error accessing camera: ' + err.message);
+    }
+  });
+  
+  // Stop camera
+  stopBtn.addEventListener('click', () => {
+    if (currentStream) {
+      currentStream.getTracks().forEach(track => track.stop());
+      currentStream = null;
+    }
+    scanning = false;
+    startBtn.style.display = 'inline-block';
+    stopBtn.style.display = 'none';
+    switchBtn.style.display = 'none';
+    flashBtn.style.display = 'none';
+  });
+  
+  // Switch camera
+  switchBtn.addEventListener('click', () => {
+    currentFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
+    stopBtn.click();
+    setTimeout(() => startBtn.click(), 100);
+  });
+  
+  // Toggle flash
+  flashBtn.addEventListener('click', async () => {
+    const track = currentStream.getVideoTracks()[0];
+    const capabilities = track.getCapabilities();
+    const settings = track.getSettings();
+    
+    if (capabilities.torch) {
+      await track.applyConstraints({
+        advanced: [{ torch: !settings.torch }]
+      });
+      flashBtn.classList.toggle('btn-warning');
+      flashBtn.classList.toggle('btn-light');
+    }
+  });
+  
+  // Scan frame for QR/barcode
+  function scanFrame() {
+    if (!scanning) return;
+    
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, imageData.width, imageData.height);
+      
+      if (code) {
+        const now = Date.now();
+        // Prevent duplicate scans within 2 seconds
+        if (code.data !== lastScannedCode || now - lastScanTime > 2000) {
+          lastScannedCode = code.data;
+          lastScanTime = now;
+          processBarcode(code.data);
+          playBeep(true);
+        }
+      }
+    }
+    
+    requestAnimationFrame(scanFrame);
+  }
+  
+  // Process scanned barcode
+  function processBarcode(barcode) {
+    if (!eventId) {
+      addStatus('error', 'No event selected', barcode);
+      return;
+    }
+    
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+    
+    fetch('/api/check-in/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrfToken
+      },
+      body: JSON.stringify({
+        event_id: eventId,
+        barcode_number: barcode,
+        check_in: true
+      })
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        const type = data.offline ? 'offline' : 'success';
+        const message = data.message || `${data.guest_name} checked in`;
+        addStatus(type, message, barcode);
+      } else {
+        addStatus('error', data.error || 'Check-in failed', barcode);
+        playBeep(false);
+      }
+    })
+    .catch(err => {
+      addStatus('error', 'Network error: ' + err.message, barcode);
+      playBeep(false);
+    });
+  }
+  
+  // Add status message
+  function addStatus(type, message, barcode) {
+    const statusItem = document.createElement('div');
+    statusItem.className = `status-item status-${type}`;
+    statusItem.innerHTML = `
+      <div>
+        <strong>${message}</strong>
+        <br><small>${barcode}</small>
+      </div>
+      <div>
+        <small>${new Date().toLocaleTimeString()}</small>
+      </div>
+    `;
+    
+    statusList.insertBefore(statusItem, statusList.firstChild);
+    
+    // Keep only last 20 items
+    while (statusList.children.length > 20) {
+      statusList.removeChild(statusList.lastChild);
+    }
+  }
+  
+  // Play beep sound
+  function playBeep(success) {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    
+    oscillator.frequency.value = success ? 800 : 400;
+    oscillator.type = 'sine';
+    gainNode.gain.value = 0.3;
+    
+    oscillator.start();
+    oscillator.stop(audioCtx.currentTime + 0.1);
+  }
+  
+  // Sync offline check-ins
+  function syncOfflineCheckIns() {
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({ action: 'sync-offline-checkins' });
+    }
+  }
+  
+  // Auto-start camera on load
+  window.addEventListener('load', () => {
+    if (eventId) {
+      startBtn.click();
+    }
+  });
+</script>
+{% endblock %}

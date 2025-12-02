@@ -6,6 +6,46 @@
 <div class="container mt-4">
     <div class="row justify-content-center">
         <div class="col-md-10">
+            <!-- Event Selection & Session Management -->
+            <div class="card mb-3">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-calendar-check me-2"></i>Active Check-In Session
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row align-items-end">
+                        <div class="col-md-8">
+                            <label for="event_select" class="form-label"><strong>Select Event:</strong></label>
+                            <select id="event_select" class="form-select">
+                                <option value="">-- Select an event to start scanning --</option>
+                                {% for event in events %}
+                                    <option value="{{ event.id }}" {% if initial_event_id and event.id|stringformat:"s" == initial_event_id %}selected{% endif %}>
+                                        {{ event.name }} — {{ event.date|date:"M d, Y" }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <button id="start_session_btn" class="btn btn-success w-100">
+                                <i class="fas fa-play me-2"></i>Start Session
+                            </button>
+                            <button id="end_session_btn" class="btn btn-danger w-100" style="display: none;">
+                                <i class="fas fa-stop me-2"></i>End Session
+                            </button>
+                        </div>
+                    </div>
+                    <div id="active_event_display" class="alert alert-success mt-3" style="display: none;">
+                        <i class="fas fa-check-circle me-2"></i>
+                        <strong>Active Session:</strong> <span id="active_event_name"></span>
+                    </div>
+                    <div id="no_session_warning" class="alert alert-warning mt-3">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>No active session.</strong> Please select an event and start a session to begin scanning.
+                    </div>
+                </div>
+            </div>
+            
             <!-- Mode Switcher -->
             <div class="card mb-3">
                 <div class="card-body">
@@ -35,6 +75,23 @@
                 </div>
                 <div class="card-body" id="queueList" style="max-height: 300px; overflow-y: auto;">
                     <!-- Queue items will be inserted here -->
+                </div>
+            </div>
+
+            <!-- Recent Check-ins with Undo -->
+            <div id="recentCheckIns" class="card mb-3">
+                <div class="card-header bg-warning text-dark">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-history me-2"></i>Recent Check-ins
+                        </h5>
+                        <button id="refreshRecentBtn" class="btn btn-light btn-sm">
+                            <i class="fas fa-sync-alt me-1"></i>Refresh
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body" id="recentList" style="max-height: 300px; overflow-y: auto;">
+                    <p class="text-muted text-center">No recent check-ins</p>
                 </div>
             </div>
 
@@ -145,7 +202,104 @@
     }
 
     // ============================================
-    // Multi-Scan Mode Management
+    // Session Management
+    // ============================================
+    let activeEventId = null;
+    let activeEventName = null;
+    
+    const eventSelect = document.getElementById('event_select');
+    const startSessionBtn = document.getElementById('start_session_btn');
+    const endSessionBtn = document.getElementById('end_session_btn');
+    const activeEventDisplay = document.getElementById('active_event_display');
+    const activeEventNameSpan = document.getElementById('active_event_name');
+    const noSessionWarning = document.getElementById('no_session_warning');
+    
+    // Check for initial event from URL
+    {% if initial_event_id %}
+    const initialEventId = '{{ initial_event_id }}';
+    if (initialEventId) {
+        activeEventId = initialEventId;
+        const selectedOption = eventSelect.options[eventSelect.selectedIndex];
+        activeEventName = selectedOption.text;
+        updateSessionUI(true);
+    }
+    {% endif %}
+    
+    function updateSessionUI(hasSession) {
+        if (hasSession) {
+            activeEventDisplay.style.display = 'block';
+            activeEventNameSpan.textContent = activeEventName;
+            noSessionWarning.style.display = 'none';
+            eventSelect.disabled = true;
+            startSessionBtn.style.display = 'none';
+            endSessionBtn.style.display = 'block';
+            document.getElementById('barcode_number').disabled = false;
+            document.getElementById('searchBtn').disabled = false;
+            document.getElementById('checkInBtn').disabled = false;
+        } else {
+            activeEventDisplay.style.display = 'none';
+            noSessionWarning.style.display = 'block';
+            eventSelect.disabled = false;
+            startSessionBtn.style.display = 'block';
+            endSessionBtn.style.display = 'none';
+            document.getElementById('barcode_number').disabled = true;
+            document.getElementById('searchBtn').disabled = true;
+            document.getElementById('checkInBtn').disabled = true;
+        }
+    }
+    
+    // Initialize UI state
+    {% if not initial_event_id %}
+    updateSessionUI(false);
+    {% endif %}
+    
+    startSessionBtn.addEventListener('click', async function() {
+        const selectedEventId = eventSelect.value;
+        if (!selectedEventId) {
+            alert('Please select an event first');
+            return;
+        }
+        
+        const selectedOption = eventSelect.options[eventSelect.selectedIndex];
+        const selectedEventName = selectedOption.text;
+        
+        try {
+            const response = await postJson('{% url "start_checkin_session" %}', { event_id: selectedEventId });
+            if (response.status === 'ok') {
+                activeEventId = selectedEventId;
+                activeEventName = selectedEventName;
+                updateSessionUI(true);
+                document.getElementById('barcode_number').focus();
+            } else {
+                alert(response.message || 'Failed to start session');
+            }
+        } catch (error) {
+            console.error('Error starting session:', error);
+            alert('Network error starting session');
+        }
+    });
+    
+    endSessionBtn.addEventListener('click', async function() {
+        if (!confirm('End this check-in session?')) return;
+        
+        try {
+            const response = await postJson('{% url "end_checkin_session" %}', { event_id: activeEventId });
+            if (response.status === 'ok') {
+                activeEventId = null;
+                activeEventName = null;
+                updateSessionUI(false);
+                eventSelect.selectedIndex = 0;
+            } else {
+                alert(response.message || 'Failed to end session');
+            }
+        } catch (error) {
+            console.error('Error ending session:', error);
+            alert('Network error ending session');
+        }
+    });
+
+    // ============================================
+    // Multi-Scan Queue Management
     // ============================================
     let multiScanMode = false;
     let scanQueue = [];
@@ -258,14 +412,34 @@
     document.getElementById('searchBtn').addEventListener('click', async function() {
         const barcode = document.getElementById('barcode_number').value.trim();
         if (!barcode) return;
-        const result = await postJson('{% url "api_check_in" %}', { barcode_number: barcode, check_in: false, table_number: document.getElementById('table_number').value.trim(), seat_number: document.getElementById('seat_number').value.trim() });
+        if (!activeEventId) {
+            alert('Please start a check-in session first');
+            return;
+        }
+        const result = await postJson('{% url "api_check_in" %}', { 
+            barcode_number: barcode, 
+            check_in: false, 
+            event_id: activeEventId,
+            table_number: document.getElementById('table_number').value.trim(), 
+            seat_number: document.getElementById('seat_number').value.trim() 
+        });
         renderResult(result, false);
     });
 
     document.getElementById('checkInBtn').addEventListener('click', async function() {
         const barcode = document.getElementById('barcode_number').value.trim();
         if (!barcode) return;
-        const result = await postJson('{% url "api_check_in" %}', { barcode_number: barcode, check_in: true, table_number: document.getElementById('table_number').value.trim(), seat_number: document.getElementById('seat_number').value.trim() });
+        if (!activeEventId) {
+            alert('Please start a check-in session first');
+            return;
+        }
+        const result = await postJson('{% url "api_check_in" %}', { 
+            barcode_number: barcode, 
+            check_in: true, 
+            event_id: activeEventId,
+            table_number: document.getElementById('table_number').value.trim(), 
+            seat_number: document.getElementById('seat_number').value.trim() 
+        });
         renderResult(result, true);
     });
 
@@ -460,6 +634,88 @@ function stopCamera() {
 
 startBtn.addEventListener('click', startCamera);
 stopBtn.addEventListener('click', stopCamera);
+
+// ============================================
+// Recent Check-ins with Undo
+// ============================================
+const recentList = document.getElementById('recentList');
+const refreshRecentBtn = document.getElementById('refreshRecentBtn');
+
+async function loadRecentCheckIns() {
+    if (!activeEventId) {
+        recentList.innerHTML = '<p class="text-muted text-center">No active session</p>';
+        return;
+    }
+    
+    try {
+        const response = await fetch(`{% url "api_recent_checkins" %}?event_id=${activeEventId}&limit=20`);
+        const data = await response.json();
+        
+        if (data.success && data.checkins.length > 0) {
+            recentList.innerHTML = data.checkins.map(item => `
+                <div class="d-flex justify-content-between align-items-center mb-2 p-2 border rounded">
+                    <div>
+                        <strong>${item.guest_name}</strong><br>
+                        <small class="text-muted">
+                            ${new Date(item.check_in_time).toLocaleTimeString()}
+                            ${item.table_number ? ` • Table ${item.table_number}` : ''}
+                            ${item.seat_number ? ` Seat ${item.seat_number}` : ''}
+                        </small>
+                    </div>
+                    <button class="btn btn-sm btn-outline-danger undo-btn" data-barcode="${item.barcode}">
+                        <i class="fas fa-undo"></i> Undo
+                    </button>
+                </div>
+            `).join('');
+            
+            // Attach undo event listeners
+            document.querySelectorAll('.undo-btn').forEach(btn => {
+                btn.addEventListener('click', async function() {
+                    const barcode = this.getAttribute('data-barcode');
+                    if (confirm('Undo this check-in?')) {
+                        await undoCheckIn(barcode);
+                    }
+                });
+            });
+        } else {
+            recentList.innerHTML = '<p class="text-muted text-center">No recent check-ins</p>';
+        }
+    } catch (error) {
+        console.error('Error loading recent check-ins:', error);
+        recentList.innerHTML = '<p class="text-danger text-center">Error loading check-ins</p>';
+    }
+}
+
+async function undoCheckIn(barcode) {
+    try {
+        const result = await postJson('{% url "api_check_in" %}', {
+            barcode_number: barcode,
+            undo: true,
+            event_id: activeEventId
+        });
+        
+        if (result.success) {
+            playSuccessBeep();
+            alert(`Check-in undone for ${result.guest_name}`);
+            loadRecentCheckIns(); // Refresh the list
+        } else {
+            playErrorBeep();
+            alert(result.message || 'Failed to undo check-in');
+        }
+    } catch (error) {
+        playErrorBeep();
+        alert('Error: ' + error.message);
+    }
+}
+
+refreshRecentBtn.addEventListener('click', loadRecentCheckIns);
+
+// Auto-refresh recent check-ins every 10 seconds when session is active
+setInterval(() => {
+    if (activeEventId) {
+        loadRecentCheckIns();
+    }
+}, 10000);
 </script>
 <!-- ZXing library for 1D barcode decoding (Code128) -->
 <script src="https://unpkg.com/@zxing/library@0.18.6/umd/index.min.js"></script>

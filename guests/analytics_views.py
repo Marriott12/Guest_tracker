@@ -198,3 +198,172 @@ def event_analytics(request, event_id):
     }
     
     return render(request, 'guests/event_analytics.html', context)
+
+
+@login_required
+def checkin_analytics(request, event_id):
+    """Enhanced check-in analytics with real-time patterns"""
+    from .models import CheckInLog
+    from django.db.models.functions import TruncHour, TruncDate
+    
+    event = get_object_or_404(Event, id=event_id)
+    
+    # Permission check
+    if not (request.user.is_staff or request.user.is_superuser or event.created_by == request.user):
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied
+    
+    # Get check-in logs
+    checkin_logs = CheckInLog.objects.filter(event=event)
+    
+    # Overall stats
+    total_invitations = event.invitations.count()
+    total_checkins = event.invitations.filter(checked_in=True).count()
+    checkin_rate = (total_checkins / total_invitations * 100) if total_invitations > 0 else 0
+    
+    # RSVP vs Actual attendance
+    rsvp_yes = RSVP.objects.filter(invitation__event=event, response='yes').count()
+    actual_attendance = total_checkins
+    attendance_fulfillment = (actual_attendance / rsvp_yes * 100) if rsvp_yes > 0 else 0
+    
+    charts = {}
+    
+    # 1. Hourly Check-in Pattern
+    if checkin_logs.exists():
+        hourly_data = checkin_logs.annotate(
+            hour=TruncHour('checked_in_at')
+        ).values('hour').annotate(count=Count('id')).order_by('hour')
+        
+        if hourly_data:
+            hours = [item['hour'].strftime('%I:%M %p') for item in hourly_data]
+            counts = [item['count'] for item in hourly_data]
+            
+            fig1 = go.Figure(data=[go.Bar(
+                x=hours,
+                y=counts,
+                marker_color='#28a745',
+                text=counts,
+                textposition='auto',
+            )])
+            fig1.update_layout(
+                title="Arrival Pattern by Hour",
+                xaxis_title="Time",
+                yaxis_title="Number of Check-ins",
+                height=400,
+                xaxis_tickangle=-45
+            )
+            charts['hourly_pattern'] = opy.plot(fig1, auto_open=False, output_type='div')
+    
+    # 2. Table Distribution
+    table_data = event.invitations.filter(
+        checked_in=True
+    ).exclude(table_number='').values('table_number').annotate(
+        count=Count('id')
+    ).order_by('-count')[:20]
+    
+    if table_data:
+        tables = [f"Table {item['table_number']}" for item in table_data]
+        counts = [item['count'] for item in table_data]
+        
+        fig2 = go.Figure(data=[go.Bar(
+            x=tables,
+            y=counts,
+            marker_color='#007bff'
+        )])
+        fig2.update_layout(
+            title="Top 20 Tables by Attendance",
+            xaxis_title="Table",
+            yaxis_title="Guests",
+            height=400
+        )
+        charts['table_distribution'] = opy.plot(fig2, auto_open=False, output_type='div')
+    
+    # 3. Check-in Status Pie Chart
+    checkin_status_data = [
+        {'status': 'Checked In', 'count': total_checkins},
+        {'status': 'Not Checked In', 'count': total_invitations - total_checkins}
+    ]
+    
+    fig3 = go.Figure(data=[go.Pie(
+        labels=[item['status'] for item in checkin_status_data],
+        values=[item['count'] for item in checkin_status_data],
+        marker_colors=['#28a745', '#dc3545'],
+        hole=.4
+    )])
+    fig3.update_layout(
+        title="Check-in Status Overview",
+        height=400
+    )
+    charts['checkin_status'] = opy.plot(fig3, auto_open=False, output_type='div')
+    
+    # 4. RSVP vs Attendance Comparison
+    rsvp_data = {
+        'Yes': RSVP.objects.filter(invitation__event=event, response='yes').count(),
+        'No': RSVP.objects.filter(invitation__event=event, response='no').count(),
+        'Maybe': RSVP.objects.filter(invitation__event=event, response='maybe').count(),
+        'No Response': total_invitations - RSVP.objects.filter(invitation__event=event).count()
+    }
+    
+    fig4 = go.Figure(data=[
+        go.Bar(name='Expected (RSVP Yes)', x=['Expected'], y=[rsvp_yes], marker_color='#ffc107'),
+        go.Bar(name='Actual (Checked In)', x=['Actual'], y=[actual_attendance], marker_color='#28a745')
+    ])
+    fig4.update_layout(
+        title="Expected vs Actual Attendance",
+        yaxis_title="Number of Guests",
+        barmode='group',
+        height=400
+    )
+    charts['rsvp_vs_actual'] = opy.plot(fig4, auto_open=False, output_type='div')
+    
+    # 5. Daily Cumulative Check-ins (for multi-day events or tracking)
+    if checkin_logs.exists():
+        daily_data = checkin_logs.annotate(
+            date=TruncDate('checked_in_at')
+        ).values('date').annotate(count=Count('id')).order_by('date')
+        
+        if len(daily_data) > 1:  # Only show if multiple days
+            dates = [item['date'].strftime('%Y-%m-%d') for item in daily_data]
+            counts = [item['count'] for item in daily_data]
+            cumulative = []
+            total = 0
+            for count in counts:
+                total += count
+                cumulative.append(total)
+            
+            fig5 = go.Figure()
+            fig5.add_trace(go.Scatter(
+                x=dates,
+                y=counts,
+                name='Daily',
+                mode='lines+markers',
+                marker_color='#007bff'
+            ))
+            fig5.add_trace(go.Scatter(
+                x=dates,
+                y=cumulative,
+                name='Cumulative',
+                mode='lines+markers',
+                marker_color='#28a745'
+            ))
+            fig5.update_layout(
+                title="Check-in Trend Over Time",
+                xaxis_title="Date",
+                yaxis_title="Check-ins",
+                height=400
+            )
+            charts['daily_trend'] = opy.plot(fig5, auto_open=False, output_type='div')
+    
+    context = {
+        'event': event,
+        'total_invitations': total_invitations,
+        'total_checkins': total_checkins,
+        'checkin_rate': round(checkin_rate, 1),
+        'rsvp_yes': rsvp_yes,
+        'actual_attendance': actual_attendance,
+        'attendance_fulfillment': round(attendance_fulfillment, 1),
+        'charts': charts,
+        'checkin_logs': checkin_logs.select_related('guest', 'invitation').order_by('-checked_in_at')[:50]
+    }
+    
+    return render(request, 'guests/checkin_analytics.html', context)

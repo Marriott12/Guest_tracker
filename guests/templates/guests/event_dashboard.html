@@ -60,6 +60,36 @@
                     <p class="text-muted">Manage your event details, guests, and invitations here.</p>
                 </div>
                 <div>
+                    <!-- Export Dropdown -->
+                    <div class="btn-group me-2" role="group">
+                        <button type="button" class="btn btn-outline-success dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-download me-2"></i>Export
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><h6 class="dropdown-header">Guest Lists</h6></li>
+                            <li><a class="dropdown-item" href="{% url 'export_guest_list_csv' event.id %}">
+                                <i class="fas fa-file-csv me-2"></i>Guest List (CSV)
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'export_guest_list_excel' event.id %}">
+                                <i class="fas fa-file-excel me-2"></i>Guest List (Excel)
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><h6 class="dropdown-header">Reports</h6></li>
+                            <li><a class="dropdown-item" href="{% url 'export_rsvp_report_csv' event.id %}">
+                                <i class="fas fa-file-csv me-2"></i>RSVP Report (CSV)
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'export_checkin_log_csv' event.id %}">
+                                <i class="fas fa-file-csv me-2"></i>Check-In Log (CSV)
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'export_seating_chart_pdf' event.id %}">
+                                <i class="fas fa-file-pdf me-2"></i>Seating Chart (PDF)
+                            </a></li>
+                        </ul>
+                    </div>
+                    
+                    <a href="{% url 'live_checkin_dashboard' %}" class="btn btn-secondary me-2" target="_blank">
+                        <i class="fas fa-chart-line me-2"></i>Live Dashboard
+                    </a>
                     <a href="{% url 'seating_chart' event.id %}" class="btn btn-info me-2">
                         <i class="fas fa-chair me-2"></i>Seating Chart
                     </a>

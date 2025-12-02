@@ -1,0 +1,314 @@
+{% extends 'guests/base.html' %}
+
+{% block title %}Live Check-In Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">
+                        <i class="fas fa-tv me-2 text-primary"></i>Live Check-In Dashboard
+                    </h1>
+                    <p class="text-muted">Real-time monitoring of guest arrivals</p>
+                </div>
+                <div>
+                    <div class="form-check form-switch d-inline-block me-3">
+                        <input class="form-check-input" type="checkbox" id="autoRefresh" checked style="width: 3em; height: 1.5em;">
+                        <label class="form-check-label ms-2" for="autoRefresh">
+                            <i class="fas fa-sync-alt"></i> Auto-Refresh
+                        </label>
+                    </div>
+                    <span class="badge bg-success" id="lastUpdate">Live</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="row mb-4">
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body text-center">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h2 class="mb-0" id="totalCheckedIn">0</h2>
+                            <small>Checked In</small>
+                        </div>
+                        <i class="fas fa-check-circle fa-3x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card text-white bg-info">
+                <div class="card-body text-center">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h2 class="mb-0" id="totalExpected">0</h2>
+                            <small>Expected</small>
+                        </div>
+                        <i class="fas fa-users fa-3x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card text-white bg-warning">
+                <div class="card-body text-center">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h2 class="mb-0" id="arrivalRate">0</h2>
+                            <small>Per 5 Min</small>
+                        </div>
+                        <i class="fas fa-chart-line fa-3x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card text-white bg-success">
+                <div class="card-body text-center">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h2 class="mb-0" id="percentageCheckedIn">0%</h2>
+                            <small>Attendance</small>
+                        </div>
+                        <i class="fas fa-percentage fa-3x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row mb-4">
+        <div class="col-md-8 mb-3">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-chart-area me-2"></i>Check-In Timeline</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="checkinChart" height="80"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Status Distribution</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="statusChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Check-Ins -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0"><i class="fas fa-history me-2"></i>Recent Check-Ins (Last 10)</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div id="recentCheckins" style="max-height: 400px; overflow-y: auto;">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Guest Name</th>
+                                    <th>Rank</th>
+                                    <th>Event</th>
+                                    <th>Table</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="checkinTableBody">
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted py-4">
+                                        <i class="fas fa-spinner fa-spin me-2"></i>Loading check-ins...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+    let checkinChart, statusChart;
+    let autoRefresh = true;
+    let refreshInterval;
+
+    // Initialize charts
+    const checkinCtx = document.getElementById('checkinChart').getContext('2d');
+    checkinChart = new Chart(checkinCtx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Check-Ins',
+                data: [],
+                borderColor: '#0d6efd',
+                backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            }
+        }
+    });
+
+    const statusCtx = document.getElementById('statusChart').getContext('2d');
+    statusChart = new Chart(statusCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Checked In', 'Not Arrived'],
+            datasets: [{
+                data: [0, 100],
+                backgroundColor: ['#198754', '#dc3545']
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+
+    // Auto-refresh toggle
+    document.getElementById('autoRefresh').addEventListener('change', function() {
+        autoRefresh = this.checked;
+        if (autoRefresh) {
+            startAutoRefresh();
+        } else {
+            stopAutoRefresh();
+        }
+    });
+
+    function startAutoRefresh() {
+        refreshInterval = setInterval(fetchDashboardData, 3000); // Refresh every 3 seconds
+    }
+
+    function stopAutoRefresh() {
+        if (refreshInterval) {
+            clearInterval(refreshInterval);
+        }
+    }
+
+    async function fetchDashboardData() {
+        try {
+            const response = await fetch('/api/live-checkin-data/');
+            const data = await response.json();
+            
+            updateStats(data);
+            updateCharts(data);
+            updateRecentCheckins(data.recent_checkins);
+            
+            // Update last update time
+            const now = new Date();
+            document.getElementById('lastUpdate').textContent = now.toLocaleTimeString();
+        } catch (error) {
+            console.error('Error fetching dashboard data:', error);
+        }
+    }
+
+    function updateStats(data) {
+        document.getElementById('totalCheckedIn').textContent = data.total_checked_in;
+        document.getElementById('totalExpected').textContent = data.total_expected;
+        document.getElementById('arrivalRate').textContent = data.arrival_rate;
+        document.getElementById('percentageCheckedIn').textContent = data.percentage_checked_in + '%';
+    }
+
+    function updateCharts(data) {
+        // Update timeline chart
+        if (data.timeline_labels && data.timeline_data) {
+            checkinChart.data.labels = data.timeline_labels;
+            checkinChart.data.datasets[0].data = data.timeline_data;
+            checkinChart.update();
+        }
+
+        // Update status chart
+        statusChart.data.datasets[0].data = [data.total_checked_in, data.total_expected - data.total_checked_in];
+        statusChart.update();
+    }
+
+    function updateRecentCheckins(checkins) {
+        const tbody = document.getElementById('checkinTableBody');
+        
+        if (!checkins || checkins.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">
+                        <i class="fas fa-inbox me-2"></i>No check-ins yet
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        tbody.innerHTML = checkins.map(checkin => `
+            <tr class="animate-row">
+                <td><small>${checkin.time}</small></td>
+                <td><strong>${checkin.guest_name}</strong></td>
+                <td>${checkin.rank || '-'}</td>
+                <td>${checkin.event_name}</td>
+                <td>${checkin.table_number || 'Unassigned'}</td>
+                <td><span class="badge bg-success">Checked In</span></td>
+            </tr>
+        `).join('');
+    }
+
+    // Initial load
+    fetchDashboardData();
+    startAutoRefresh();
+
+    // Add CSS animation for new rows
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        .animate-row {
+            animation: slideIn 0.3s ease-out;
+        }
+        .opacity-50 {
+            opacity: 0.5;
+        }
+    `;
+    document.head.appendChild(style);
+</script>
+{% endblock %}

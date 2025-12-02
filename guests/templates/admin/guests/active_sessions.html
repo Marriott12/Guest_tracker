@@ -35,6 +35,9 @@
       <td>
         {% if item.session %}
           <button type="button" class="button session-action" data-action="end" data-eventid="{{ item.event.id }}">End Session</button>
+          <a href="{% url 'scan_barcode' %}?event_id={{ item.event.id }}" class="button" target="_blank" style="margin-left: 8px; background: #28a745; color: white;">
+            <i class="fas fa-barcode"></i> Scan Guests
+          </a>
         {% else %}
           <button type="button" class="button session-action" data-action="start" data-eventid="{{ item.event.id }}">Start Session</button>
         {% endif %}

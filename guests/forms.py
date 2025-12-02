@@ -115,13 +115,16 @@ class GuestForm(forms.ModelForm):
     
     class Meta:
         model = Guest
-        fields = ['first_name', 'last_name', 'email', 'phone', 'address', 'notes']
+        fields = ['first_name', 'last_name', 'email', 'phone', 'address', 'rank', 'institution', 'photo', 'notes']
         widgets = {
             'first_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'First Name'}),
             'last_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Last Name'}),
             'email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'email@example.com'}),
             'phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '+1234567890'}),
             'address': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'rank': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g., Captain, Colonel'}),
+            'institution': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g., Army Division'}),
+            'photo': forms.FileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
             'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
         }
 

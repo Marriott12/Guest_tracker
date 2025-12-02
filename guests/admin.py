@@ -47,6 +47,7 @@ class EventAdmin(admin.ModelAdmin):
     list_filter = ['date', 'created_by']
     search_fields = ['name', 'location']
     readonly_fields = ['created_at']
+    actions = ['save_as_template_action']
     fieldsets = (
         ('Basic Information', {
             'fields': ('name', 'description', 'date', 'location', 'created_by', 'event_banner')
@@ -78,6 +79,31 @@ class EventAdmin(admin.ModelAdmin):
     inlines = [ProgramItemInline, MenuItemInline, TableInline]
     class Media:
         js = ('guests/js/move_inlines.js',)
+    
+    def get_form(self, request, obj=None, **kwargs):
+        """Customize form to pre-populate from template if template_id is in query string"""
+        form = super().get_form(request, obj, **kwargs)
+        
+        # Check for template_id in query string
+        template_id = request.GET.get('template_id')
+        if template_id and not obj:  # Only for new events
+            try:
+                template = EventTemplate.objects.get(id=template_id)
+                # Set initial values from template
+                form.base_fields['name'].initial = template.name
+                form.base_fields['description'].initial = template.description
+                form.base_fields['location'].initial = template.default_location
+                form.base_fields['max_guests'].initial = template.default_max_guests
+                form.base_fields['dress_code'].initial = template.dress_code
+                form.base_fields['parking_info'].initial = template.parking_info
+                form.base_fields['special_instructions'].initial = template.special_instructions
+                form.base_fields['program_schedule'].initial = template.program_schedule
+                form.base_fields['menu'].initial = template.menu
+                form.base_fields['has_assigned_seating'].initial = template.has_assigned_seating
+            except EventTemplate.DoesNotExist:
+                pass
+        
+        return form
     
     def invitation_count(self, obj):
         return obj.invitations.count()
@@ -479,13 +505,77 @@ class EventAdmin(admin.ModelAdmin):
         return render(request, 'admin/guests/active_sessions.html', {
             'sessions': sessions,
         })
+    
+    def save_as_template_action(self, request, queryset):
+        """Admin action to save selected events as templates"""
+        if queryset.count() != 1:
+            self.message_user(request, 'Please select exactly one event to save as template.', level='WARNING')
+            return
+        
+        event = queryset.first()
+        
+        # Create template from event
+        template = EventTemplate.objects.create(
+            name=f"{event.name} (Template)",
+            description=event.description,
+            default_location=event.location,
+            default_max_guests=event.max_guests,
+            default_rsvp_deadline_days=7,
+            dress_code=event.dress_code,
+            parking_info=event.parking_info,
+            special_instructions=event.special_instructions,
+            program_schedule=event.program_schedule.copy() if event.program_schedule else {},
+            menu=event.menu.copy() if event.menu else {},
+            has_assigned_seating=event.has_assigned_seating,
+            created_by=request.user
+        )
+        
+        self.message_user(request, f'✅ Template "{template.name}" created successfully! You can now use it to create future events.')
+        
+        # Redirect to the template edit page
+        return HttpResponse(f'<script>window.location.href="{reverse("admin:guests_eventtemplate_change", args=[template.id])}";</script>')
+    
+    save_as_template_action.short_description = 'Save selected event as template'
 
 @admin.register(Guest)
 class GuestAdmin(admin.ModelAdmin):
-    list_display = ['full_name', 'email', 'phone', 'created_at']
-    list_filter = ['created_at']
-    search_fields = ['first_name', 'last_name', 'email']
-    readonly_fields = ['created_at']
+    list_display = ['full_name', 'email', 'phone', 'rank', 'institution', 'photo_thumbnail', 'created_at']
+    list_filter = ['created_at', 'rank', 'institution']
+    search_fields = ['first_name', 'last_name', 'email', 'rank', 'institution']
+    readonly_fields = ['created_at', 'photo_preview']
+    fieldsets = (
+        ('Personal Information', {
+            'fields': ('first_name', 'last_name', 'email', 'phone', 'address')
+        }),
+        ('Professional Details', {
+            'fields': ('rank', 'institution', 'notes')
+        }),
+        ('Photo', {
+            'fields': ('photo', 'photo_preview')
+        }),
+        ('Portal Access', {
+            'fields': ('user', 'can_login', 'last_login'),
+            'classes': ('collapse',)
+        }),
+        ('System Info', {
+            'fields': ('created_at',),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def photo_thumbnail(self, obj):
+        """Display small thumbnail in list view"""
+        if obj.photo:
+            return format_html('<img src="{}" width="40" height="40" style="border-radius: 50%; object-fit: cover;" />', obj.photo.url)
+        return format_html('<span style="color: #999;">No photo</span>')
+    photo_thumbnail.short_description = 'Photo'
+    
+    def photo_preview(self, obj):
+        """Display larger preview in detail view"""
+        if obj.photo:
+            return format_html('<img src="{}" width="150" height="150" style="border-radius: 10px; object-fit: cover;" />', obj.photo.url)
+        return format_html('<span style="color: #999;">No photo uploaded</span>')
+    photo_preview.short_description = 'Photo Preview'
 
 @admin.register(Invitation)
 class InvitationAdmin(admin.ModelAdmin):
@@ -594,10 +684,61 @@ class EventCategoryAdmin(admin.ModelAdmin):
 
 @admin.register(EventTemplate)
 class EventTemplateAdmin(admin.ModelAdmin):
-    list_display = ['name', 'category', 'created_by', 'created_at']
+    list_display = ['name', 'category', 'created_by', 'created_at', 'create_event_button']
     list_filter = ['category', 'created_by', 'created_at']
     search_fields = ['name', 'description']
     readonly_fields = ['created_at']
+    actions = ['create_event_from_template_action']
+    
+    fieldsets = (
+        ('Template Information', {
+            'fields': ('name', 'description', 'category')
+        }),
+        ('Default Settings', {
+            'fields': ('default_location', 'default_max_guests', 'default_rsvp_deadline_days')
+        }),
+        ('Event Details', {
+            'fields': ('dress_code', 'parking_info', 'special_instructions', 'has_assigned_seating')
+        }),
+        ('Program & Menu', {
+            'fields': ('program_schedule', 'menu'),
+            'classes': ('collapse',)
+        }),
+        ('Email Template', {
+            'fields': ('email_template',),
+            'classes': ('collapse',)
+        }),
+        ('System Info', {
+            'fields': ('created_at',),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def create_event_button(self, obj):
+        """Display a button to create event from this template"""
+        return format_html(
+            '<a class="button" href="{}?template_id={}" style="padding: 5px 10px; background: #417690; color: white; border-radius: 4px; text-decoration: none;">Use Template</a>',
+            reverse('admin:guests_event_add'),
+            obj.id
+        )
+    create_event_button.short_description = 'Actions'
+    
+    def create_event_from_template_action(self, request, queryset):
+        """Bulk action to create events from selected templates"""
+        if queryset.count() != 1:
+            self.message_user(request, 'Please select exactly one template to use.', level='WARNING')
+            return
+        
+        template = queryset.first()
+        return HttpResponse(f'<script>window.location.href="{reverse("admin:guests_event_add")}?template_id={template.id}";</script>')
+    
+    create_event_from_template_action.short_description = 'Create event from selected template'
+    
+    def save_model(self, request, obj, form, change):
+        """Auto-set created_by on new templates"""
+        if not change:
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)
 
 @admin.register(GuestProfile)
 class GuestProfileAdmin(admin.ModelAdmin):
