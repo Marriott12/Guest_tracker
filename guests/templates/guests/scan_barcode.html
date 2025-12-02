@@ -30,6 +30,9 @@
                             <button id="start_session_btn" class="btn btn-success w-100">
                                 <i class="fas fa-play me-2"></i>Start Session
                             </button>
+                            <button id="join_session_btn" class="btn btn-info w-100" style="display: none;">
+                                <i class="fas fa-sign-in-alt me-2"></i>Join Session
+                            </button>
                             <button id="end_session_btn" class="btn btn-danger w-100" style="display: none;">
                                 <i class="fas fa-stop me-2"></i>End Session
                             </button>
@@ -38,6 +41,7 @@
                     <div id="active_event_display" class="alert alert-success mt-3" style="display: none;">
                         <i class="fas fa-check-circle me-2"></i>
                         <strong>Active Session:</strong> <span id="active_event_name"></span>
+                        <br><small class="text-muted">Started by: <span id="session_started_by"></span> at <span id="session_started_at"></span></small>
                     </div>
                     <div id="no_session_warning" class="alert alert-warning mt-3">
                         <i class="fas fa-exclamation-triangle me-2"></i>
@@ -206,13 +210,47 @@
     // ============================================
     let activeEventId = null;
     let activeEventName = null;
+    let sessionData = null;
     
     const eventSelect = document.getElementById('event_select');
     const startSessionBtn = document.getElementById('start_session_btn');
+    const joinSessionBtn = document.getElementById('join_session_btn');
     const endSessionBtn = document.getElementById('end_session_btn');
     const activeEventDisplay = document.getElementById('active_event_display');
     const activeEventNameSpan = document.getElementById('active_event_name');
+    const sessionStartedBySpan = document.getElementById('session_started_by');
+    const sessionStartedAtSpan = document.getElementById('session_started_at');
     const noSessionWarning = document.getElementById('no_session_warning');
+    
+    // Check for active sessions when event is selected
+    eventSelect.addEventListener('change', async function() {
+        const selectedEventId = this.value;
+        if (!selectedEventId) {
+            startSessionBtn.style.display = 'block';
+            joinSessionBtn.style.display = 'none';
+            return;
+        }
+        
+        // Check if there's an active session for this event
+        try {
+            const response = await fetch(`{% url "active_checkin_sessions" %}?event_id=${selectedEventId}`);
+            const data = await response.json();
+            
+            if (data.active && data.session) {
+                // Show join button instead of start button
+                startSessionBtn.style.display = 'none';
+                joinSessionBtn.style.display = 'block';
+                sessionData = data.session;
+            } else {
+                // Show start button
+                startSessionBtn.style.display = 'block';
+                joinSessionBtn.style.display = 'none';
+                sessionData = null;
+            }
+        } catch (error) {
+            console.error('Error checking session:', error);
+        }
+    });
     
     // Check for initial event from URL
     {% if initial_event_id %}
@@ -225,13 +263,19 @@
     }
     {% endif %}
     
-    function updateSessionUI(hasSession) {
+    function updateSessionUI(hasSession, sessionInfo = null) {
         if (hasSession) {
             activeEventDisplay.style.display = 'block';
             activeEventNameSpan.textContent = activeEventName;
+            if (sessionInfo) {
+                sessionStartedBySpan.textContent = sessionInfo.started_by || 'Unknown';
+                const startTime = new Date(sessionInfo.started_at);
+                sessionStartedAtSpan.textContent = startTime.toLocaleString();
+            }
             noSessionWarning.style.display = 'none';
             eventSelect.disabled = true;
             startSessionBtn.style.display = 'none';
+            joinSessionBtn.style.display = 'none';
             endSessionBtn.style.display = 'block';
             document.getElementById('barcode_number').disabled = false;
             document.getElementById('searchBtn').disabled = false;
@@ -241,6 +285,7 @@
             noSessionWarning.style.display = 'block';
             eventSelect.disabled = false;
             startSessionBtn.style.display = 'block';
+            joinSessionBtn.style.display = 'none';
             endSessionBtn.style.display = 'none';
             document.getElementById('barcode_number').disabled = true;
             document.getElementById('searchBtn').disabled = true;
@@ -253,6 +298,25 @@
     updateSessionUI(false);
     {% endif %}
     
+    // On page load, check if selected event has an active session
+    (async function() {
+        const selectedEventId = eventSelect.value;
+        if (selectedEventId) {
+            try {
+                const response = await fetch(`{% url "active_checkin_sessions" %}?event_id=${selectedEventId}`);
+                const data = await response.json();
+                
+                if (data.active && data.session) {
+                    startSessionBtn.style.display = 'none';
+                    joinSessionBtn.style.display = 'block';
+                    sessionData = data.session;
+                }
+            } catch (error) {
+                console.error('Error checking initial session:', error);
+            }
+        }
+    })();
+    
     startSessionBtn.addEventListener('click', async function() {
         const selectedEventId = eventSelect.value;
         if (!selectedEventId) {
@@ -264,12 +328,18 @@
         const selectedEventName = selectedOption.text;
         
         try {
-            const response = await postJson('{% url "start_checkin_session" %}', { event_id: selectedEventId });
+            const response = await postJson('{% url "start_checkin_session" %}', { event_id: selectedEventId, join: false });
             if (response.status === 'ok') {
                 activeEventId = selectedEventId;
                 activeEventName = selectedEventName;
-                updateSessionUI(true);
+                sessionData = response.session;
+                updateSessionUI(true, response.session);
                 document.getElementById('barcode_number').focus();
+            } else if (response.can_join) {
+                // Session exists, offer to join
+                if (confirm(response.message + ' Would you like to join it instead?')) {
+                    joinSessionBtn.click();
+                }
             } else {
                 alert(response.message || 'Failed to start session');
             }
@@ -279,14 +349,51 @@
         }
     });
     
+    joinSessionBtn.addEventListener('click', async function() {
+        const selectedEventId = eventSelect.value;
+        if (!selectedEventId) {
+            alert('Please select an event first');
+            return;
+        }
+        
+        const selectedOption = eventSelect.options[eventSelect.selectedIndex];
+        const selectedEventName = selectedOption.text;
+        
+        try {
+            const response = await postJson('{% url "start_checkin_session" %}', { event_id: selectedEventId, join: true });
+            if (response.status === 'ok') {
+                activeEventId = selectedEventId;
+                activeEventName = selectedEventName;
+                sessionData = response.session;
+                updateSessionUI(true, response.session);
+                document.getElementById('barcode_number').focus();
+                
+                // Show success message
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-info alert-dismissible fade show mt-3';
+                alertDiv.innerHTML = `
+                    <i class="fas fa-info-circle me-2"></i>${response.message || 'Joined session successfully'}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                `;
+                document.querySelector('.card-body').insertBefore(alertDiv, document.querySelector('.row'));
+            } else {
+                alert(response.message || 'Failed to join session');
+            }
+        } catch (error) {
+            console.error('Error joining session:', error);
+            alert('Network error joining session');
+        }
+    });
+    
     endSessionBtn.addEventListener('click', async function() {
-        if (!confirm('End this check-in session?')) return;
+        if (!confirm('End this check-in session? This will affect all users currently using this session.')) return;
         
         try {
             const response = await postJson('{% url "end_checkin_session" %}', { event_id: activeEventId });
             if (response.status === 'ok') {
                 activeEventId = null;
                 activeEventName = null;
+                sessionData = null;
                 updateSessionUI(false);
                 eventSelect.selectedIndex = 0;
             } else {
@@ -491,6 +598,21 @@
             
             // Regular single-scan display
             const displayName = (inv.guest_rank ? (inv.guest_rank + ' ') : '') + inv.guest_name;
+            
+            // Determine seating status
+            const hasSeating = inv.table_number || inv.seat_number;
+            const seatingBadge = hasSeating 
+                ? `<span class="badge bg-info"><i class="fas fa-chair me-1"></i>Seating Assigned</span>`
+                : `<span class="badge bg-secondary"><i class="fas fa-question me-1"></i>No Seating</span>`;
+            
+            const tableDisplay = inv.table_number 
+                ? `<strong>Table:</strong> ${inv.table_number}` 
+                : '<strong>Table:</strong> <span class="text-muted">Not Assigned</span>';
+                
+            const seatDisplay = inv.seat_number 
+                ? `<strong>Seat:</strong> ${inv.seat_number}` 
+                : '<strong>Seat:</strong> <span class="text-muted">Not Assigned</span>';
+            
             container.innerHTML = `
                 <div class="p-3 bg-light rounded">
                     <h5 class="mb-2">${displayName}</h5>
@@ -498,18 +620,21 @@
                     <p><strong>Email:</strong> ${inv.email}</p>
                     <p><strong>Event:</strong> ${inv.event}</p>
                     <p><strong>Checked In:</strong> ${inv.checked_in ? '<span class="badge bg-success">Yes</span>' : '<span class="badge bg-warning">No</span>'}</p>
-                        <p><strong>Table:</strong> ${inv.table_number || 'Unassigned'} &nbsp; <strong>Seat:</strong> ${inv.seat_number || 'Unassigned'}</p>
-                        <div class="row g-2 mt-2">
-                            <div class="col-md-6">
-                                <input id="result_table_number" class="form-control" placeholder="Table (optional)" value="${inv.table_number || ''}" />
-                            </div>
-                            <div class="col-md-6">
-                                <input id="result_seat_number" class="form-control" placeholder="Seat (optional)" value="${inv.seat_number || ''}" />
-                            </div>
+                    <p class="mb-2"><strong>Seating Status:</strong> ${seatingBadge}</p>
+                    <p class="mb-3">${tableDisplay} &nbsp;&nbsp; ${seatDisplay}</p>
+                    <div class="row g-2 mt-2">
+                        <div class="col-md-6">
+                            <label class="form-label small">Update Table</label>
+                            <input id="result_table_number" class="form-control" placeholder="Table Number" value="${inv.table_number || ''}" />
                         </div>
-                        <div class="mt-2">
-                            ${inv.checked_in ? '<span class="badge bg-success">Checked In</span>' : '<button id="confirmCheckIn" class="btn btn-success">Confirm Check-In</button>'}
+                        <div class="col-md-6">
+                            <label class="form-label small">Update Seat</label>
+                            <input id="result_seat_number" class="form-control" placeholder="Seat Number" value="${inv.seat_number || ''}" />
                         </div>
+                    </div>
+                    <div class="mt-3">
+                        ${inv.checked_in ? '<span class="badge bg-success"><i class="fas fa-check-circle me-1"></i>Already Checked In</span>' : '<button id="confirmCheckIn" class="btn btn-success"><i class="fas fa-check me-2"></i>Confirm Check-In</button>'}
+                    </div>
                 </div>
             `;
 

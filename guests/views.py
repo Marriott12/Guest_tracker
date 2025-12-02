@@ -607,9 +607,9 @@ def api_check_in(request):
             'event': invitation.event.name,
             'checked_in': invitation.checked_in,
             'check_in_time': invitation.check_in_time.isoformat() if invitation.check_in_time else None,
-            # Only include seating details if guest is checked in
-            'table_number': invitation.table_number if invitation.checked_in else None,
-            'seat_number': invitation.seat_number if invitation.checked_in else None,
+            # Include seating details regardless of check-in status
+            'table_number': invitation.table_number or '',
+            'seat_number': invitation.seat_number or '',
             'barcode_number': invitation.barcode_number,
             'unique_code': str(invitation.unique_code),
         }
@@ -728,6 +728,7 @@ def start_checkin_session(request):
     except Exception:
         data = request.POST
     event_id = data.get('event_id')
+    join_existing = data.get('join', False)  # Allow joining existing session
     if not event_id:
         return JsonResponse({'status': 'error', 'message': 'event_id required'}, status=400)
     try:
@@ -736,10 +737,44 @@ def start_checkin_session(request):
         return JsonResponse({'status': 'error', 'message': 'Event not found'}, status=404)
 
     session_key = f'guests:checkin_session:{event_id}'
-    # Prevent starting a second active session for the same event
+    # Check if session already exists
+    existing_session = cache.get(session_key)
     active_db = CheckInSession.objects.filter(event=ev, ended_at__isnull=True).first()
-    if active_db:
-        return JsonResponse({'status': 'error', 'message': 'A session is already active for this event.'}, status=409)
+    
+    # If joining an existing session, return the active session details
+    if join_existing and (existing_session or active_db):
+        if existing_session:
+            return JsonResponse({
+                'status': 'ok', 
+                'session': existing_session,
+                'joined': True,
+                'message': f'{request.user.username} joined the session'
+            })
+        # If cache missing but DB has active session, reconstruct from DB
+        if active_db:
+            session_data = {
+                'event_id': int(event_id),
+                'event_name': ev.name,
+                'started_by': active_db.started_by.username if active_db.started_by else 'Unknown',
+                'started_at': active_db.started_at.isoformat(),
+                'session_id': active_db.id
+            }
+            # Restore to cache
+            cache.set(session_key, session_data, timeout=getattr(settings, 'CHECKIN_SESSION_TIMEOUT', 60 * 60 * 8))
+            return JsonResponse({
+                'status': 'ok',
+                'session': session_data,
+                'joined': True,
+                'message': f'{request.user.username} joined the session'
+            })
+    
+    # Prevent starting a second active session for the same event (unless joining)
+    if not join_existing and (existing_session or active_db):
+        return JsonResponse({
+            'status': 'error', 
+            'message': 'A session is already active for this event. Use join=true to join it.',
+            'can_join': True
+        }, status=409)
 
     session_data = {
         'event_id': int(event_id),
