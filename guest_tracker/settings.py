@@ -84,8 +84,17 @@ WSGI_APPLICATION = 'guest_tracker.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# Support DATABASE_URL for simple PostgreSQL configuration
+DATABASE_URL = config('DATABASE_URL', default='')
+
+if DATABASE_URL:
+    # Parse DATABASE_URL - supports postgresql://, mysql://, sqlite:///
+    import dj_database_url
+    DATABASES = {
+        'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600)
+    }
 # Default to SQLite for development, configure PostgreSQL for production via .env
-if config('DB_ENGINE', default='django.db.backends.sqlite3') == 'django.db.backends.sqlite3':
+elif config('DB_ENGINE', default='django.db.backends.sqlite3') == 'django.db.backends.sqlite3':
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
