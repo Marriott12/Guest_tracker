@@ -424,19 +424,6 @@ def scan_barcode(request):
     
     # Get event_id from URL parameter if present
     initial_event_id = request.GET.get('event_id')
-
-def mobile_scanner(request):
-    """Mobile-optimized scanner with camera support"""
-    upcoming_events = Event.objects.filter(
-        date__gte=timezone.now()
-    ).order_by('date')[:50]
-    
-    initial_event_id = request.GET.get('event_id')
-    
-    return render(request, 'guests/mobile_scanner.html', {
-        'events': upcoming_events,
-        'initial_event_id': initial_event_id
-    })
     
     if request.method == 'POST':
         barcode_number = request.POST.get('barcode_number', '').strip()
@@ -456,6 +443,20 @@ def mobile_scanner(request):
         'error_message': error_message,
         'events': upcoming_events,
         'initial_event_id': initial_event_id,
+    })
+
+
+def mobile_scanner(request):
+    """Mobile-optimized scanner with camera support"""
+    upcoming_events = Event.objects.filter(
+        date__gte=timezone.now()
+    ).order_by('date')[:50]
+    
+    initial_event_id = request.GET.get('event_id')
+    
+    return render(request, 'guests/mobile_scanner.html', {
+        'events': upcoming_events,
+        'initial_event_id': initial_event_id
     })
 
 
