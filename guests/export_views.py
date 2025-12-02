@@ -7,6 +7,7 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 import csv
+import os
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
@@ -14,7 +15,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter, A4, landscape
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak, Image as ReportLabImage
 from reportlab.pdfgen import canvas
 from io import BytesIO
 from datetime import datetime
@@ -277,6 +278,273 @@ def export_seating_chart_pdf(request, event_id):
     
     # Build PDF
     doc.build(elements)
+    
+    pdf = buffer.getvalue()
+    buffer.close()
+    response.write(pdf)
+    
+    return response
+
+
+@login_required
+def print_invitation_card(request, invitation_id):
+    """Print invitation card with QR code and barcode"""
+    from django.core.exceptions import PermissionDenied
+    from reportlab.platypus import PageBreak
+    
+    invitation = get_object_or_404(Invitation, id=invitation_id)
+    event = invitation.event
+    
+    # Permission check
+    if not (request.user.is_staff or request.user.is_superuser or event.created_by == request.user):
+        raise PermissionDenied
+    
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="invitation_card_{invitation.guest.full_name}_{event.name}.pdf"'
+    
+    buffer = BytesIO()
+    # Use smaller page size for invitation card (6x4 inches)
+    page_width = 6*inch
+    page_height = 4*inch
+    doc = SimpleDocTemplate(buffer, pagesize=(page_width, page_height), 
+                           topMargin=0.3*inch, bottomMargin=0.3*inch,
+                           leftMargin=0.3*inch, rightMargin=0.3*inch)
+    
+    elements = []
+    styles = getSampleStyleSheet()
+    
+    # Custom styles
+    title_style = ParagraphStyle(
+        'InvitationTitle',
+        parent=styles['Heading1'],
+        fontSize=18,
+        textColor=colors.HexColor('#0066CC'),
+        spaceAfter=10,
+        alignment=1  # Center
+    )
+    
+    name_style = ParagraphStyle(
+        'GuestName',
+        parent=styles['Heading2'],
+        fontSize=16,
+        textColor=colors.black,
+        spaceAfter=8,
+        alignment=1
+    )
+    
+    detail_style = ParagraphStyle(
+        'Details',
+        parent=styles['Normal'],
+        fontSize=11,
+        spaceAfter=6,
+        alignment=1
+    )
+    
+    # Title
+    elements.append(Paragraph("You're Invited!", title_style))
+    
+    # Guest name with rank
+    guest_name = f"{invitation.guest.rank} {invitation.guest.full_name}" if invitation.guest.rank else invitation.guest.full_name
+    elements.append(Paragraph(f"<b>{guest_name}</b>", name_style))
+    
+    # Event details
+    elements.append(Paragraph(f"<b>{event.name}</b>", detail_style))
+    elements.append(Paragraph(f"📅 {event.date.strftime('%B %d, %Y at %I:%M %p')}", detail_style))
+    elements.append(Paragraph(f"📍 {event.location}", detail_style))
+    
+    # Seating info if available
+    if invitation.table_number:
+        seating_info = f"Table {invitation.table_number}"
+        if invitation.seat_number:
+            seating_info += f", Seat {invitation.seat_number}"
+        elements.append(Paragraph(f"🪑 {seating_info}", detail_style))
+    
+    elements.append(Spacer(1, 0.15*inch))
+    
+    # QR Code and Barcode section
+    codes_data = []
+    
+    # Add QR code if available
+    if invitation.qr_code and hasattr(invitation.qr_code, 'path') and os.path.exists(invitation.qr_code.path):
+        try:
+            qr_img = ReportLabImage(invitation.qr_code.path, width=1.2*inch, height=1.2*inch)
+            qr_label = Paragraph("<b>Scan to RSVP</b>", ParagraphStyle('QRLabel', parent=styles['Normal'], fontSize=8, alignment=1))
+            qr_cell = [[qr_img], [qr_label]]
+            codes_data.append(Table(qr_cell, colWidths=[1.2*inch]))
+        except:
+            pass
+    
+    # Add barcode if available
+    if invitation.barcode_image and hasattr(invitation.barcode_image, 'path') and os.path.exists(invitation.barcode_image.path):
+        try:
+            barcode_img = ReportLabImage(invitation.barcode_image.path, width=2*inch, height=0.8*inch)
+            barcode_label = Paragraph("<b>Check-in Code</b>", ParagraphStyle('BarcodeLabel', parent=styles['Normal'], fontSize=8, alignment=1))
+            barcode_cell = [[barcode_img], [barcode_label]]
+            codes_data.append(Table(barcode_cell, colWidths=[2*inch]))
+        except:
+            pass
+    
+    # Create table with codes side by side if both available
+    if codes_data:
+        codes_table = Table([codes_data], colWidths=[2.5*inch] * len(codes_data))
+        codes_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ]))
+        elements.append(codes_table)
+    
+    elements.append(Spacer(1, 0.1*inch))
+    
+    # Footer
+    footer_style = ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, alignment=1, textColor=colors.grey)
+    if event.rsvp_deadline:
+        elements.append(Paragraph(f"Please RSVP by {event.rsvp_deadline.strftime('%B %d, %Y')}", footer_style))
+    
+    # Border around entire card
+    def add_border(canvas, doc):
+        canvas.saveState()
+        canvas.setStrokeColor(colors.HexColor('#0066CC'))
+        canvas.setLineWidth(2)
+        canvas.rect(0.2*inch, 0.2*inch, page_width - 0.4*inch, page_height - 0.4*inch)
+        canvas.restoreState()
+    
+    # Build PDF
+    doc.build(elements, onFirstPage=add_border, onLaterPages=add_border)
+    
+    pdf = buffer.getvalue()
+    buffer.close()
+    response.write(pdf)
+    
+    return response
+
+
+@login_required
+def print_event_invitation_cards(request, event_id):
+    """Print invitation cards for all guests in an event"""
+    from django.core.exceptions import PermissionDenied
+    from reportlab.platypus import PageBreak
+    
+    event = get_object_or_404(Event, id=event_id)
+    
+    # Permission check
+    if not (request.user.is_staff or request.user.is_superuser or event.created_by == request.user):
+        raise PermissionDenied
+    
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="invitation_cards_{event.name}_{timezone.now().strftime("%Y%m%d")}.pdf"'
+    
+    buffer = BytesIO()
+    # Use card size
+    page_width = 6*inch
+    page_height = 4*inch
+    doc = SimpleDocTemplate(buffer, pagesize=(page_width, page_height),
+                           topMargin=0.3*inch, bottomMargin=0.3*inch,
+                           leftMargin=0.3*inch, rightMargin=0.3*inch)
+    
+    all_elements = []
+    styles = getSampleStyleSheet()
+    
+    # Custom styles
+    title_style = ParagraphStyle(
+        'InvitationTitle',
+        parent=styles['Heading1'],
+        fontSize=18,
+        textColor=colors.HexColor('#0066CC'),
+        spaceAfter=10,
+        alignment=1
+    )
+    
+    name_style = ParagraphStyle(
+        'GuestName',
+        parent=styles['Heading2'],
+        fontSize=16,
+        textColor=colors.black,
+        spaceAfter=8,
+        alignment=1
+    )
+    
+    detail_style = ParagraphStyle(
+        'Details',
+        parent=styles['Normal'],
+        fontSize=11,
+        spaceAfter=6,
+        alignment=1
+    )
+    
+    footer_style = ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, alignment=1, textColor=colors.grey)
+    
+    invitations = event.invitations.select_related('guest').order_by('guest__last_name', 'guest__first_name')
+    
+    for idx, invitation in enumerate(invitations):
+        if idx > 0:
+            all_elements.append(PageBreak())
+        
+        # Title
+        all_elements.append(Paragraph("You're Invited!", title_style))
+        
+        # Guest name with rank
+        guest_name = f"{invitation.guest.rank} {invitation.guest.full_name}" if invitation.guest.rank else invitation.guest.full_name
+        all_elements.append(Paragraph(f"<b>{guest_name}</b>", name_style))
+        
+        # Event details
+        all_elements.append(Paragraph(f"<b>{event.name}</b>", detail_style))
+        all_elements.append(Paragraph(f"📅 {event.date.strftime('%B %d, %Y at %I:%M %p')}", detail_style))
+        all_elements.append(Paragraph(f"📍 {event.location}", detail_style))
+        
+        # Seating info
+        if invitation.table_number:
+            seating_info = f"Table {invitation.table_number}"
+            if invitation.seat_number:
+                seating_info += f", Seat {invitation.seat_number}"
+            all_elements.append(Paragraph(f"🪑 {seating_info}", detail_style))
+        
+        all_elements.append(Spacer(1, 0.15*inch))
+        
+        # QR Code and Barcode
+        codes_data = []
+        
+        if invitation.qr_code and hasattr(invitation.qr_code, 'path') and os.path.exists(invitation.qr_code.path):
+            try:
+                qr_img = ReportLabImage(invitation.qr_code.path, width=1.2*inch, height=1.2*inch)
+                qr_label = Paragraph("<b>Scan to RSVP</b>", ParagraphStyle('QRLabel', parent=styles['Normal'], fontSize=8, alignment=1))
+                qr_cell = [[qr_img], [qr_label]]
+                codes_data.append(Table(qr_cell, colWidths=[1.2*inch]))
+            except:
+                pass
+        
+        if invitation.barcode_image and hasattr(invitation.barcode_image, 'path') and os.path.exists(invitation.barcode_image.path):
+            try:
+                barcode_img = ReportLabImage(invitation.barcode_image.path, width=2*inch, height=0.8*inch)
+                barcode_label = Paragraph("<b>Check-in Code</b>", ParagraphStyle('BarcodeLabel', parent=styles['Normal'], fontSize=8, alignment=1))
+                barcode_cell = [[barcode_img], [barcode_label]]
+                codes_data.append(Table(barcode_cell, colWidths=[2*inch]))
+            except:
+                pass
+        
+        if codes_data:
+            codes_table = Table([codes_data], colWidths=[2.5*inch] * len(codes_data))
+            codes_table.setStyle(TableStyle([
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ]))
+            all_elements.append(codes_table)
+        
+        all_elements.append(Spacer(1, 0.1*inch))
+        
+        # Footer
+        if event.rsvp_deadline:
+            all_elements.append(Paragraph(f"Please RSVP by {event.rsvp_deadline.strftime('%B %d, %Y')}", footer_style))
+    
+    # Border function
+    def add_border(canvas, doc):
+        canvas.saveState()
+        canvas.setStrokeColor(colors.HexColor('#0066CC'))
+        canvas.setLineWidth(2)
+        canvas.rect(0.2*inch, 0.2*inch, page_width - 0.4*inch, page_height - 0.4*inch)
+        canvas.restoreState()
+    
+    # Build PDF
+    doc.build(all_elements, onFirstPage=add_border, onLaterPages=add_border)
     
     pdf = buffer.getvalue()
     buffer.close()

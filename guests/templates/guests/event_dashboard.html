@@ -84,6 +84,11 @@
                             <li><a class="dropdown-item" href="{% url 'export_seating_chart_pdf' event.id %}">
                                 <i class="fas fa-file-pdf me-2"></i>Seating Chart (PDF)
                             </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><h6 class="dropdown-header">Invitation Cards</h6></li>
+                            <li><a class="dropdown-item" href="{% url 'print_event_invitation_cards' event.id %}">
+                                <i class="fas fa-print me-2"></i>Print All Invitation Cards
+                            </a></li>
                         </ul>
                     </div>
                     
@@ -318,6 +323,11 @@
                                            target="_blank"
                                            title="View RSVP Form">
                                             <i class="fas fa-external-link-alt"></i>
+                                        </a>
+                                        <a href="{% url 'print_invitation_card' invitation.id %}" 
+                                           class="btn btn-sm btn-outline-info" 
+                                           title="Print Invitation Card">
+                                            <i class="fas fa-print"></i>
                                         </a>
                                         {% if invitation.email_sent %}
                                         <form method="post" action="{% url 'resend_invitation' invitation.id %}" style="display: inline;">
