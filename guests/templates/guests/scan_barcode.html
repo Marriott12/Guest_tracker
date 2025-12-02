@@ -5,7 +5,39 @@
 {% block content %}
 <div class="container mt-4">
     <div class="row justify-content-center">
-        <div class="col-md-8">
+        <div class="col-md-10">
+            <!-- Mode Switcher -->
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Scanning Mode</h5>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="multiScanMode" style="width: 3em; height: 1.5em;">
+                            <label class="form-check-label ms-2" for="multiScanMode">
+                                <strong>Multi-Scan Mode</strong> <small class="text-muted">(Rapid Check-ins)</small>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Multi-Scan Queue (Hidden by default) -->
+            <div id="scanQueue" class="card mb-3" style="display: none;">
+                <div class="card-header bg-success text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-users me-2"></i>Check-In Queue (<span id="queueCount">0</span>)
+                        </h5>
+                        <button id="clearQueueBtn" class="btn btn-light btn-sm">
+                            <i class="fas fa-trash me-1"></i>Clear All
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body" id="queueList" style="max-height: 300px; overflow-y: auto;">
+                    <!-- Queue items will be inserted here -->
+                </div>
+            </div>
+
             <div class="card">
                 <div class="card-header bg-primary text-white">
                     <h4 class="mb-0">
@@ -74,7 +106,128 @@
 </div>
 
 <script>
-    // Auto-submit form when barcode is scanned (typically ends with Enter key)
+    // ============================================
+    // Audio Feedback System
+    // ============================================
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    
+    function playBeep(frequency = 800, duration = 100, type = 'success') {
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        if (type === 'success') {
+            oscillator.frequency.value = 800; // High pitch for success
+        } else if (type === 'error') {
+            oscillator.frequency.value = 200; // Low pitch for error
+        } else {
+            oscillator.frequency.value = frequency;
+        }
+        
+        oscillator.type = 'sine';
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration / 1000);
+        
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + duration / 1000);
+    }
+    
+    function playSuccessBeep() {
+        // Two-tone success beep
+        playBeep(800, 100);
+        setTimeout(() => playBeep(1000, 100), 120);
+    }
+    
+    function playErrorBeep() {
+        playBeep(200, 200, 'error');
+    }
+
+    // ============================================
+    // Multi-Scan Mode Management
+    // ============================================
+    let multiScanMode = false;
+    let scanQueue = [];
+    
+    const multiScanToggle = document.getElementById('multiScanMode');
+    const queueContainer = document.getElementById('scanQueue');
+    const queueList = document.getElementById('queueList');
+    const queueCount = document.getElementById('queueCount');
+    const clearQueueBtn = document.getElementById('clearQueueBtn');
+    
+    multiScanToggle.addEventListener('change', function() {
+        multiScanMode = this.checked;
+        queueContainer.style.display = multiScanMode ? 'block' : 'none';
+        if (!multiScanMode) {
+            scanQueue = [];
+            updateQueueDisplay();
+        }
+    });
+    
+    clearQueueBtn.addEventListener('click', function() {
+        if (confirm('Clear all queued check-ins?')) {
+            scanQueue = [];
+            updateQueueDisplay();
+        }
+    });
+    
+    function addToQueue(invitation, checked_in) {
+        const exists = scanQueue.find(item => item.barcode_number === invitation.barcode_number);
+        if (exists) {
+            playErrorBeep();
+            return;
+        }
+        
+        scanQueue.push({
+            ...invitation,
+            timestamp: new Date(),
+            checked_in: checked_in
+        });
+        
+        updateQueueDisplay();
+        playSuccessBeep();
+    }
+    
+    function removeFromQueue(barcode) {
+        scanQueue = scanQueue.filter(item => item.barcode_number !== barcode);
+        updateQueueDisplay();
+    }
+    
+    function updateQueueDisplay() {
+        queueCount.textContent = scanQueue.length;
+        
+        if (scanQueue.length === 0) {
+            queueList.innerHTML = '<p class="text-muted text-center mb-0">No guests in queue</p>';
+            return;
+        }
+        
+        queueList.innerHTML = scanQueue.map((item, index) => {
+            const displayName = (item.guest_rank ? (item.guest_rank + ' ') : '') + item.guest_name;
+            const badgeClass = item.checked_in ? 'bg-success' : 'bg-warning';
+            const statusText = item.checked_in ? 'Checked In' : 'Pending';
+            
+            return `
+                <div class="d-flex justify-content-between align-items-center border-bottom py-2">
+                    <div>
+                        <strong>${index + 1}. ${displayName}</strong>
+                        <small class="d-block text-muted">${item.event}</small>
+                        <span class="badge ${badgeClass}">${statusText}</span>
+                    </div>
+                    <button class="btn btn-sm btn-outline-danger" onclick="removeFromQueue('${item.barcode_number}')">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+        }).join('');
+    }
+    
+    // Make removeFromQueue globally accessible
+    window.removeFromQueue = removeFromQueue;
+
+    // ============================================
+    // Auto-submit form when barcode is scanned
+    // ============================================
     const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
 
     async function postJson(url, data) {
@@ -92,7 +245,13 @@
     document.getElementById('barcode_number').addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
             e.preventDefault();
-            document.getElementById('searchBtn').click();
+            if (multiScanMode) {
+                // In multi-scan mode, auto check-in
+                document.getElementById('checkInBtn').click();
+            } else {
+                // In single mode, just search
+                document.getElementById('searchBtn').click();
+            }
         }
     });
 
@@ -100,33 +259,63 @@
         const barcode = document.getElementById('barcode_number').value.trim();
         if (!barcode) return;
         const result = await postJson('{% url "api_check_in" %}', { barcode_number: barcode, check_in: false, table_number: document.getElementById('table_number').value.trim(), seat_number: document.getElementById('seat_number').value.trim() });
-        renderResult(result);
+        renderResult(result, false);
     });
 
     document.getElementById('checkInBtn').addEventListener('click', async function() {
         const barcode = document.getElementById('barcode_number').value.trim();
         if (!barcode) return;
         const result = await postJson('{% url "api_check_in" %}', { barcode_number: barcode, check_in: true, table_number: document.getElementById('table_number').value.trim(), seat_number: document.getElementById('seat_number').value.trim() });
-        renderResult(result);
+        renderResult(result, true);
     });
 
-    function renderResult(result) {
+    function renderResult(result, wasCheckIn) {
         const container = document.getElementById('scanResult');
         container.style.display = 'block';
+        
         if (!result) {
             container.innerHTML = '<div class="alert alert-danger">No response from server</div>';
+            playErrorBeep();
             return;
         }
         if (result.status === 'forbidden') {
             container.innerHTML = `<div class="alert alert-danger">${result.message}</div>`;
+            playErrorBeep();
             return;
         }
         if (result.status === 'not_found' || result.status === 'error') {
             container.innerHTML = `<div class="alert alert-warning">${result.message}</div>`;
+            playErrorBeep();
             return;
         }
         if (result.status === 'ok') {
             const inv = result.invitation;
+            
+            // Play success sound
+            playSuccessBeep();
+            
+            // Add to queue if in multi-scan mode
+            if (multiScanMode && wasCheckIn) {
+                addToQueue(inv, inv.checked_in);
+                // Auto-clear input for next scan
+                document.getElementById('barcode_number').value = '';
+                document.getElementById('barcode_number').focus();
+                // Show minimal feedback in single scan result area
+                container.innerHTML = `
+                    <div class="alert alert-success alert-dismissible fade show">
+                        <i class="fas fa-check-circle me-2"></i>
+                        <strong>${(inv.guest_rank ? (inv.guest_rank + ' ') : '') + inv.guest_name}</strong> added to queue!
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                `;
+                // Auto-hide after 2 seconds
+                setTimeout(() => {
+                    container.style.display = 'none';
+                }, 2000);
+                return;
+            }
+            
+            // Regular single-scan display
             const displayName = (inv.guest_rank ? (inv.guest_rank + ' ') : '') + inv.guest_name;
             container.innerHTML = `
                 <div class="p-3 bg-light rounded">
@@ -134,7 +323,7 @@
                     ${inv.guest_institution ? `<p><strong>Institution:</strong> ${inv.guest_institution}</p>` : ''}
                     <p><strong>Email:</strong> ${inv.email}</p>
                     <p><strong>Event:</strong> ${inv.event}</p>
-                    <p><strong>Checked In:</strong> ${inv.checked_in ? 'Yes' : 'No'}</p>
+                    <p><strong>Checked In:</strong> ${inv.checked_in ? '<span class="badge bg-success">Yes</span>' : '<span class="badge bg-warning">No</span>'}</p>
                         <p><strong>Table:</strong> ${inv.table_number || 'Unassigned'} &nbsp; <strong>Seat:</strong> ${inv.seat_number || 'Unassigned'}</p>
                         <div class="row g-2 mt-2">
                             <div class="col-md-6">
@@ -154,8 +343,16 @@
             if (confirmBtn) {
                 confirmBtn.addEventListener('click', async function() {
                     const r = await postJson('{% url "api_check_in" %}', { barcode_number: inv.barcode_number, check_in: true });
-                    renderResult(r);
+                    renderResult(r, true);
                 });
+            }
+            
+            // Auto-clear input after successful check-in (even in single mode)
+            if (wasCheckIn && inv.checked_in) {
+                setTimeout(() => {
+                    document.getElementById('barcode_number').value = '';
+                    document.getElementById('barcode_number').focus();
+                }, 1500);
             }
         }
     }
