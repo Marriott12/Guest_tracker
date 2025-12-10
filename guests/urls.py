@@ -32,6 +32,8 @@ urlpatterns = [
     
     # Event management URLs
     path('event/<int:event_id>/dashboard/', views.event_dashboard, name='event_dashboard'),
+    path('event/<int:event_id>/attendees/', views.event_attendees_list, name='event_attendees_list'),
+    path('event/<int:event_id>/non-attendees/', views.event_non_attendees_list, name='event_non_attendees_list'),
     path('event/<int:event_id>/send-invitations/', views.send_invitations, name='send_invitations'),
     path('event/<int:event_id>/add-guest/', views.add_guest, name='add_guest_to_event'),
     path('event/<int:event_id>/seating-chart/', views.seating_chart, name='seating_chart'),

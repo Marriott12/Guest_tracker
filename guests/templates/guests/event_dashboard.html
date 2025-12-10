@@ -118,31 +118,37 @@
                     <div class="card bg-primary text-white">
                         <div class="card-body text-center">
                             <h3>{{ stats.total_invitations }}</h3>
-                            <p class="mb-0">Total Invitations</p>
+                            <p class="mb-0">Total Invited</p>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-3">
                     <div class="card bg-success text-white">
                         <div class="card-body text-center">
-                            <h3>{{ stats.rsvp_yes }}</h3>
-                            <p class="mb-0">Yes Responses</p>
+                            <h3>{{ stats.total_checked_in }}</h3>
+                            <p class="mb-0">Checked In</p>
+                            <a href="{% url 'event_attendees_list' event.id %}" class="btn btn-sm btn-light mt-2">
+                                <i class="fas fa-list me-1"></i>View List
+                            </a>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-3">
                     <div class="card bg-danger text-white">
                         <div class="card-body text-center">
-                            <h3>{{ stats.rsvp_no }}</h3>
-                            <p class="mb-0">No Responses</p>
+                            <h3>{{ stats.total_not_attended }}</h3>
+                            <p class="mb-0">Did Not Attend</p>
+                            <a href="{% url 'event_non_attendees_list' event.id %}" class="btn btn-sm btn-light mt-2">
+                                <i class="fas fa-list me-1"></i>View List
+                            </a>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="card bg-warning text-white">
+                    <div class="card bg-info text-white">
                         <div class="card-body text-center">
-                            <h3>{{ stats.no_response }}</h3>
-                            <p class="mb-0">No Response</p>
+                            <h3>{{ stats.rsvp_yes }}</h3>
+                            <p class="mb-0">RSVP Yes</p>
                         </div>
                     </div>
                 </div>
@@ -152,45 +158,54 @@
                 <div class="col-md-6">
                     <div class="card">
                         <div class="card-header">
-                            <h5><i class="fas fa-chart-pie me-2"></i>Response Summary</h5>
+                            <h5><i class="fas fa-calendar me-2"></i>Event Information</h5>
                         </div>
                         <div class="card-body">
-                            <div class="mb-2 d-flex justify-content-between">
-                                <span>Expected Guests:</span>
-                                <strong class="text-success">{{ stats.total_expected_guests }}</strong>
-                            </div>
-                            <div class="mb-2 d-flex justify-content-between">
-                                <span>Maybe Responses:</span>
-                                <span class="text-warning">{{ stats.rsvp_maybe }}</span>
-                            </div>
-                            <div class="progress" style="height: 25px;">
-                                <div class="progress-bar bg-success" style="width: {{ stats.rsvp_yes|floatformat:0 }}%">
-                                    Yes
-                                </div>
-                                <div class="progress-bar bg-warning" style="width: {{ stats.rsvp_maybe|floatformat:0 }}%">
-                                    Maybe
-                                </div>
-                                <div class="progress-bar bg-danger" style="width: {{ stats.rsvp_no|floatformat:0 }}%">
-                                    No
-                                </div>
-                            </div>
+                            <p><strong>Date:</strong> {{ event.date|date:"F d, Y g:i A" }}</p>
+                            <p><strong>Location:</strong> {{ event.location }}</p>
+                            <p><strong>Total Invited:</strong> {{ stats.total_invitations }}</p>
+                            <p><strong>Total Checked In:</strong> <span class="text-success">{{ stats.total_checked_in }}</span></p>
+                            <p class="mb-0"><strong>Did Not Attend:</strong> <span class="text-danger">{{ stats.total_not_attended }}</span></p>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-6">
                     <div class="card">
                         <div class="card-header">
-                            <h5><i class="fas fa-info-circle me-2"></i>Event Details</h5>
+                            <h5><i class="fas fa-chart-pie me-2"></i>RSVP Summary</h5>
                         </div>
                         <div class="card-body">
-                            <p><strong>Date:</strong> {{ event.date|date:"F d, Y g:i A" }}</p>
-                            <p><strong>Location:</strong> {{ event.location }}</p>
-                            {% if event.rsvp_deadline %}
-                            <p><strong>RSVP Deadline:</strong> {{ event.rsvp_deadline|date:"F d, Y g:i A" }}</p>
-                            {% endif %}
-                            {% if event.max_guests %}
-                            <p><strong>Max Guests:</strong> {{ event.max_guests }}</p>
-                            {% endif %}
+                            <div class="mb-2 d-flex justify-content-between">
+                                <span>Yes Responses:</span>
+                                <strong class="text-success">{{ stats.rsvp_yes }}</strong>
+                            </div>
+                            <div class="mb-2 d-flex justify-content-between">
+                                <span>No Responses:</span>
+                                <span class="text-danger">{{ stats.rsvp_no }}</span>
+                            </div>
+                            <div class="mb-2 d-flex justify-content-between">
+                                <span>Maybe Responses:</span>
+                                <span class="text-warning">{{ stats.rsvp_maybe }}</span>
+                            </div>
+                            <div class="mb-2 d-flex justify-content-between">
+                                <span>No Response:</span>
+                                <span class="text-muted">{{ stats.no_response }}</span>
+                            </div>
+                            <div class="mb-2 d-flex justify-content-between">
+                                <span>Expected Guests:</span>
+                                <strong class="text-info">{{ stats.total_expected_guests }}</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-warning text-white">
+                        <div class="card-body text-center">
+                            <h3>{{ stats.no_response }}</h3>
+                            <p class="mb-0">No Response</p>
                         </div>
                     </div>
                 </div>

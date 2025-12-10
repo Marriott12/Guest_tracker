@@ -508,6 +508,15 @@ class Invitation(models.Model):
             if update_fields:
                 try:
                     self.save(update_fields=update_fields)
+                    # Update CheckInLog with new seating information
+                    if assigned and ('table_number' in update_fields or 'seat_number' in update_fields):
+                        CheckInLog.objects.filter(
+                            invitation=self,
+                            event=self.event
+                        ).update(
+                            table_number=self.table_number,
+                            seat_number=self.seat_number
+                        )
                 except Exception:
                     logging.exception('Failed to save seating updates for invitation %s', getattr(self, 'id', None))
 

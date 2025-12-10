@@ -615,7 +615,16 @@
             
             container.innerHTML = `
                 <div class="p-3 bg-light rounded">
-                    <h5 class="mb-2">${displayName}</h5>
+                    <h5 class="mb-3">${displayName}</h5>
+                    
+                    ${inv.barcode_image_url ? `
+                    <div class="text-center mb-3">
+                        <p class="mb-2"><strong>Barcode:</strong></p>
+                        <img src="${inv.barcode_image_url}" alt="Barcode" style="max-width: 300px; height: auto;" class="border rounded p-2 bg-white">
+                        <p class="small text-muted mt-1">${inv.barcode_number}</p>
+                    </div>
+                    ` : `<p class="mb-2"><strong>Barcode:</strong> ${inv.barcode_number}</p>`}
+                    
                     ${inv.guest_institution ? `<p><strong>Institution:</strong> ${inv.guest_institution}</p>` : ''}
                     <p><strong>Email:</strong> ${inv.email}</p>
                     <p><strong>Event:</strong> ${inv.event}</p>

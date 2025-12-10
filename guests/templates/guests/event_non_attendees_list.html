@@ -1,0 +1,161 @@
+{% extends 'guests/base.html' %}
+
+{% block title %}Non-Attendees List - {{ event.name }} - Zambia Army Guest Tracking System{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0"><i class="fas fa-user-times me-2"></i>Non-Attendees List</h1>
+            <p class="text-muted">{{ event.name }} - Invited guests who did not check in</p>
+        </div>
+        <a href="{% url 'event_dashboard' event.id %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
+        </a>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header bg-danger text-white">
+            <h5 class="mb-0">
+                <i class="fas fa-exclamation-circle me-2"></i>Total Non-Attendees: {{ total_count }}
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover table-striped" id="nonAttendeesTable">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Guest Name</th>
+                            <th>Email</th>
+                            <th>Institution</th>
+                            <th>RSVP Status</th>
+                            <th>Invitation Status</th>
+                            <th>Barcode</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for invitation in non_attendees %}
+                        <tr>
+                            <td>{{ forloop.counter }}</td>
+                            <td>
+                                <strong>{{ invitation.guest.full_name }}</strong>
+                                {% if invitation.guest.rank %}
+                                <br><small class="text-muted">{{ invitation.guest.rank }}</small>
+                                {% endif %}
+                            </td>
+                            <td>{{ invitation.guest.email }}</td>
+                            <td>
+                                {% if invitation.guest.institution %}
+                                    {{ invitation.guest.institution }}
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if invitation.rsvp %}
+                                    {% if invitation.rsvp.response == 'yes' %}
+                                        <span class="badge bg-success">Yes</span>
+                                    {% elif invitation.rsvp.response == 'no' %}
+                                        <span class="badge bg-danger">No</span>
+                                    {% else %}
+                                        <span class="badge bg-warning">Maybe</span>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="badge bg-secondary">No Response</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if invitation.email_sent %}
+                                    <span class="badge bg-info">
+                                        <i class="fas fa-check me-1"></i>Sent
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-warning">
+                                        <i class="fas fa-clock me-1"></i>Pending
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <small class="font-monospace">{{ invitation.barcode_number }}</small>
+                            </td>
+                            <td>
+                                <a href="{% url 'rsvp' invitation.unique_code %}" 
+                                   class="btn btn-sm btn-outline-primary" 
+                                   target="_blank"
+                                   title="View RSVP">
+                                    <i class="fas fa-external-link-alt"></i>
+                                </a>
+                                {% if invitation.email_sent %}
+                                <form method="post" action="{% url 'resend_invitation' invitation.id %}" style="display: inline;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{% url 'event_non_attendees_list' event.id %}">
+                                    <button type="submit" 
+                                            class="btn btn-sm btn-outline-success" 
+                                            title="Resend Invitation"
+                                            onclick="return confirm('Resend invitation to {{ invitation.guest.full_name }}?');">
+                                        <i class="fas fa-redo"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-4">
+                                <i class="fas fa-check-circle me-2"></i>All invited guests have checked in! 🎉
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="text-center mb-4">
+        <a href="{% url 'export_guest_list_csv' event.id %}" class="btn btn-danger">
+            <i class="fas fa-file-csv me-2"></i>Export to CSV
+        </a>
+        <a href="{% url 'event_dashboard' event.id %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+        </a>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Simple table search functionality
+document.addEventListener('DOMContentLoaded', function() {
+    // Add search box
+    const cardHeader = document.querySelector('.card-header');
+    const searchDiv = document.createElement('div');
+    searchDiv.className = 'input-group mt-2';
+    searchDiv.innerHTML = `
+        <span class="input-group-text"><i class="fas fa-search"></i></span>
+        <input type="text" class="form-control" id="searchInput" placeholder="Search by name, email, or barcode...">
+    `;
+    cardHeader.appendChild(searchDiv);
+    
+    const searchInput = document.getElementById('searchInput');
+    const table = document.getElementById('nonAttendeesTable');
+    const rows = table.querySelectorAll('tbody tr');
+    
+    searchInput.addEventListener('keyup', function() {
+        const searchTerm = this.value.toLowerCase();
+        
+        rows.forEach(row => {
+            const text = row.textContent.toLowerCase();
+            if (text.includes(searchTerm)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

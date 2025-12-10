@@ -203,6 +203,10 @@ def event_dashboard(request, event_id):
         if hasattr(inv, 'rsvp') and inv.rsvp.response == 'yes'
     )
     
+    # Attendance statistics
+    total_checked_in = invitations.filter(checked_in=True).count()
+    total_not_attended = total_invitations - total_checked_in
+    
     context = {
         'event': event,
         'invitations': invitations,
@@ -213,10 +217,40 @@ def event_dashboard(request, event_id):
             'rsvp_maybe': rsvp_maybe,
             'no_response': no_response,
             'total_expected_guests': total_expected_guests,
+            'total_checked_in': total_checked_in,
+            'total_not_attended': total_not_attended,
         }
     }
     
     return render(request, 'guests/event_dashboard.html', context)
+
+@login_required
+def event_attendees_list(request, event_id):
+    """View list of guests who attended (checked in)"""
+    event = get_object_or_404(Event, id=event_id, created_by=request.user)
+    attendees = event.invitations.filter(checked_in=True).select_related('guest').order_by('check_in_time')
+    
+    context = {
+        'event': event,
+        'attendees': attendees,
+        'total_count': attendees.count(),
+    }
+    
+    return render(request, 'guests/event_attendees_list.html', context)
+
+@login_required
+def event_non_attendees_list(request, event_id):
+    """View list of guests who were invited but did not attend"""
+    event = get_object_or_404(Event, id=event_id, created_by=request.user)
+    non_attendees = event.invitations.filter(checked_in=False).select_related('guest').order_by('guest__full_name')
+    
+    context = {
+        'event': event,
+        'non_attendees': non_attendees,
+        'total_count': non_attendees.count(),
+    }
+    
+    return render(request, 'guests/event_non_attendees_list.html', context)
 
 @login_required
 @ratelimit(key='user', rate='50/h', method='POST', block=True)
@@ -612,6 +646,9 @@ def api_check_in(request):
             'seat_number': invitation.seat_number or '',
             'barcode_number': invitation.barcode_number,
             'unique_code': str(invitation.unique_code),
+            # Add barcode and QR code image URLs for display
+            'barcode_image_url': invitation.barcode_image.url if invitation.barcode_image else '',
+            'qr_code_image_url': invitation.qr_code_image.url if invitation.qr_code_image else '',
         }
     }
 
