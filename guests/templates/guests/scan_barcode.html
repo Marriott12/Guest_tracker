@@ -278,6 +278,7 @@
             joinSessionBtn.style.display = 'none';
             endSessionBtn.style.display = 'block';
             document.getElementById('barcode_number').disabled = false;
+            document.getElementById('barcode_number').placeholder = 'Scan or type barcode number';
             document.getElementById('searchBtn').disabled = false;
             document.getElementById('checkInBtn').disabled = false;
         } else {
@@ -287,7 +288,9 @@
             startSessionBtn.style.display = 'block';
             joinSessionBtn.style.display = 'none';
             endSessionBtn.style.display = 'none';
-            document.getElementById('barcode_number').disabled = true;
+            // Keep barcode field enabled but warn user
+            document.getElementById('barcode_number').disabled = false;
+            document.getElementById('barcode_number').placeholder = '⚠️ Start a session first, then scan barcode';
             document.getElementById('searchBtn').disabled = true;
             document.getElementById('checkInBtn').disabled = true;
         }
@@ -506,6 +509,11 @@
     document.getElementById('barcode_number').addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
             e.preventDefault();
+            if (!activeEventId) {
+                playErrorBeep();
+                alert('⚠️ No active session! Please select an event and start a session first.');
+                return;
+            }
             if (multiScanMode) {
                 // In multi-scan mode, auto check-in
                 document.getElementById('checkInBtn').click();

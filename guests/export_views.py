@@ -551,3 +551,200 @@ def print_event_invitation_cards(request, event_id):
     response.write(pdf)
     
     return response
+
+
+@login_required
+def print_blank_barcodes(request):
+    """Print bulk blank barcodes (not assigned to any guest) for pre-printing on cards"""
+    from django.core.exceptions import PermissionDenied
+    import barcode
+    from barcode.writer import ImageWriter
+    
+    # Permission check - only staff can print blank barcodes
+    if not (request.user.is_staff or request.user.is_superuser):
+        raise PermissionDenied
+    
+    # Get range from query parameters
+    try:
+        start_num = int(request.GET.get('start', 1))
+        end_num = int(request.GET.get('end', 30))
+    except (ValueError, TypeError):
+        return HttpResponse("Invalid range parameters. Use ?start=1&end=400", status=400)
+    
+    # Validate range
+    if start_num < 1 or end_num < start_num or (end_num - start_num) > 1000:
+        return HttpResponse("Invalid range. Start must be >= 1, end must be >= start, and range cannot exceed 1000 barcodes.", status=400)
+    
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="ZambiaArmy_Barcodes_{start_num}-{end_num}.pdf"'
+    
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4,
+                           topMargin=0.5*inch, bottomMargin=0.4*inch,
+                           leftMargin=0.5*inch, rightMargin=0.5*inch)
+    
+    elements = []
+    styles = getSampleStyleSheet()
+    
+    # Custom styles for professional look
+    header_style = ParagraphStyle(
+        'Header',
+        parent=styles['Heading1'],
+        fontSize=18,
+        textColor=colors.HexColor('#1a472a'),  # Dark green for Zambia Army
+        spaceAfter=4,
+        alignment=1,
+        fontName='Helvetica-Bold'
+    )
+    
+    subtitle_style = ParagraphStyle(
+        'Subtitle',
+        parent=styles['Normal'],
+        fontSize=11,
+        textColor=colors.HexColor('#666666'),
+        spaceAfter=8,
+        alignment=1,
+        fontName='Helvetica'
+    )
+    
+    footer_style = ParagraphStyle(
+        'Footer',
+        parent=styles['Normal'],
+        fontSize=8,
+        textColor=colors.grey,
+        alignment=1,
+        fontName='Helvetica-Oblique'
+    )
+    
+    # Generate barcodes: 4 columns × 9 rows = 36 per page
+    cols = 4
+    rows = 9
+    barcodes_per_page = cols * rows
+    
+    current_barcode_num = start_num
+    page_num = 1
+    
+    while current_barcode_num <= end_num:
+        # Create grid for this page (no header)
+        barcode_data = []
+        
+        for row in range(rows):
+            row_data = []
+            for col in range(cols):
+                if current_barcode_num <= end_num:
+                    # Use 3-digit zero-padded number for reliable scanning
+                    # But display the plain number to the user
+                    barcode_number = f"{current_barcode_num:03d}"
+                    
+                    # Generate barcode image in memory
+                    try:
+                        code128 = barcode.get_barcode_class('code128')
+                        barcode_instance = code128(barcode_number, writer=ImageWriter())
+                        
+                        barcode_buffer = BytesIO()
+                        barcode_instance.write(barcode_buffer, options={
+                            'module_width': 0.24,  # Reduced by 15% (was 0.28)
+                            'module_height': 12,   # Reduced by 15% (was 14)
+                            'quiet_zone': 3,       # More whitespace around barcode
+                            'font_size': 0,        # Hide built-in text
+                            'text_distance': 1,
+                        })
+                        barcode_buffer.seek(0)
+                        
+                        # Create barcode image - 15% smaller
+                        barcode_img = ReportLabImage(barcode_buffer, width=1.36*inch, height=0.595*inch)
+                        
+                        # Create label with plain number (no prefix, no zeros)
+                        barcode_label = Paragraph(
+                            f"<para align='center'><b><font size='11' face='Courier'>{current_barcode_num}</font></b></para>",
+                            styles['Normal']
+                        )
+                        
+                        # Small ID number at top (plain number)
+                        id_label = Paragraph(
+                            f"<para align='center'><font size='8' color='#999999'>#{current_barcode_num}</font></para>",
+                            styles['Normal']
+                        )
+                        
+                        # Create cell with professional layout
+                        cell_content = Table(
+                            [[id_label], [barcode_img], [barcode_label]],
+                            colWidths=[1.65*inch],
+                            rowHeights=[0.15*inch, 0.595*inch, 0.22*inch]
+                        )
+                        cell_content.setStyle(TableStyle([
+                            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                            ('BOX', (0, 0), (-1, -1), 1.2, colors.HexColor('#1a472a')),  # Green border
+                            ('BACKGROUND', (0, 0), (0, 0), colors.HexColor('#f5f5f5')),  # Light gray for ID
+                            ('TOPPADDING', (0, 0), (-1, -1), 4),
+                            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+                            ('LEFTPADDING', (0, 0), (-1, -1), 3),
+                            ('RIGHTPADDING', (0, 0), (-1, -1), 3),
+                        ]))
+                        
+                        row_data.append(cell_content)
+                    except Exception as e:
+                        # If barcode generation fails, add styled error cell
+                        error_label = Paragraph(
+                            f"<para align='center'><font size='8' face='Courier'><b>{barcode_number}</b></font><br/><font size='7' color='red'>⚠ Generation Error</font></para>",
+                            styles['Normal']
+                        )
+                        row_data.append(error_label)
+                    
+                    current_barcode_num += 1
+                else:
+                    # Empty cell for incomplete last page with subtle background
+                    empty_cell = Table([[Paragraph("", styles['Normal'])]], colWidths=[1.65*inch], rowHeights=[1.1*inch])
+                    empty_cell.setStyle(TableStyle([
+                        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#fafafa')),
+                        ('BOX', (0, 0), (-1, -1), 0.5, colors.lightgrey),
+                    ]))
+                    row_data.append(empty_cell)
+            
+            barcode_data.append(row_data)
+        
+        # Create table for this page with spacious layout
+        col_width = 1.8*inch   # Wider columns for more space
+        row_height = 1.15*inch  # Taller rows for easier cutting
+        
+        barcode_table = Table(
+            barcode_data,
+            colWidths=[col_width] * cols,
+            rowHeights=[row_height] * rows
+        )
+        
+        barcode_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#dddddd')),  # Light grid for cutting guides
+            ('BOX', (0, 0), (-1, -1), 1.5, colors.HexColor('#1a472a')),  # Dark green outer border
+            ('LEFTPADDING', (0, 0), (-1, -1), 6),   # More spacing
+            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        
+        elements.append(barcode_table)
+        
+        # Add page break if there are more barcodes
+        if current_barcode_num <= end_num:
+            elements.append(PageBreak())
+    
+    # Build PDF with page numbers
+    def add_page_border(canvas, doc):
+        """Add subtle page border and watermark"""
+        canvas.saveState()
+        # Outer border
+        canvas.setStrokeColor(colors.HexColor('#1a472a'))
+        canvas.setLineWidth(2)
+        canvas.rect(0.3*inch, 0.3*inch, A4[0] - 0.6*inch, A4[1] - 0.6*inch)
+        canvas.restoreState()
+    
+    doc.build(elements, onFirstPage=add_page_border, onLaterPages=add_page_border)
+    
+    pdf = buffer.getvalue()
+    buffer.close()
+    response.write(pdf)
+    
+    return response

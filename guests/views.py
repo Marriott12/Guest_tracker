@@ -50,7 +50,10 @@ from django.db.models import Count, Q
 from django_ratelimit.decorators import ratelimit
 from django.views.decorators.http import require_POST
 import json
+import logging
 from .models import Event, Guest, Invitation, RSVP
+
+logger = logging.getLogger(__name__)
 from .models import CheckInSession
 from django.core.cache import cache
 from .forms import RSVPForm, GuestForm, GuestProfileForm, UserProfileForm, GuestRegistrationForm
@@ -369,7 +372,13 @@ def add_guest(request, event_id=None):
     
     if request.method == 'POST':
         form = GuestForm(request.POST, request.FILES)
+        
+        # Debug logging
+        logger.info(f"add_guest POST: event_id={event_id}, user={request.user.username}")
+        logger.info(f"Form data: {request.POST}")
+        
         if form.is_valid():
+            logger.info("Form is valid, saving guest...")
             guest = form.save()
             
             # Get event from form if not from URL
@@ -398,6 +407,9 @@ def add_guest(request, event_id=None):
             else:
                 messages.success(request, f'Guest {guest.full_name} added successfully!')
                 return redirect('add_guest')
+        else:
+            logger.warning(f"Form validation failed. Errors: {form.errors}")
+            messages.error(request, 'Please correct the errors below.')
     else:
         # Initialize form with event pre-selected if coming from event dashboard
         initial = {}

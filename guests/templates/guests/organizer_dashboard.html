@@ -266,6 +266,31 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Print Blank Barcodes -->
+                    <div class="card mt-3">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-barcode me-2"></i>Print Blank Barcodes</h5>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted small mb-3">Generate pre-numbered barcodes for printing on cards (28 per page, spacious layout for easy cutting).</p>
+                            <form action="{% url 'print_blank_barcodes' %}" method="get" target="_blank">
+                                <div class="row g-2 mb-3">
+                                    <div class="col-6">
+                                        <label for="start_num" class="form-label small">Start #</label>
+                                        <input type="number" class="form-control form-control-sm" id="start_num" name="start" value="1" min="1" required>
+                                    </div>
+                                    <div class="col-6">
+                                        <label for="end_num" class="form-label small">End #</label>
+                                        <input type="number" class="form-control form-control-sm" id="end_num" name="end" value="400" min="1" max="1000" required>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-success btn-sm w-100">
+                                    <i class="fas fa-print me-1"></i>Generate PDF
+                                </button>
+                            </form>
+                        </div>
+                    </div>
                 </div>
             </div>
         </main>

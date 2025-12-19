@@ -1,0 +1,11 @@
+{% extends "admin/change_list.html" %}
+{% load i18n admin_urls %}
+
+{% block object-tools-items %}
+    {{ block.super }}
+    <li>
+        <a href="{% url 'admin:invitation_import_csv' %}" class="btn btn-success" style="background-color: #28a745; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px; display: inline-block;">
+            <i class="fas fa-file-import"></i> Import from CSV
+        </a>
+    </li>
+{% endblock %}

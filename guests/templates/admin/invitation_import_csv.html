@@ -1,0 +1,150 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+    .import-form {
+        max-width: 800px;
+        margin: 30px auto;
+        background: white;
+        padding: 30px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .form-group {
+        margin-bottom: 20px;
+    }
+    .form-group label {
+        display: block;
+        font-weight: bold;
+        margin-bottom: 8px;
+        color: #333;
+    }
+    .form-group select,
+    .form-group input[type="file"] {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+    }
+    .btn-primary {
+        background-color: #417690;
+        color: white;
+        padding: 12px 24px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: bold;
+    }
+    .btn-primary:hover {
+        background-color: #2e5568;
+    }
+    .btn-secondary {
+        background-color: #6c757d;
+        color: white;
+        padding: 12px 24px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        text-decoration: none;
+        display: inline-block;
+    }
+    .info-box {
+        background: #e7f3ff;
+        border-left: 4px solid #2196F3;
+        padding: 15px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+    }
+    .csv-format {
+        background: #f5f5f5;
+        padding: 15px;
+        border-radius: 4px;
+        margin-top: 10px;
+        font-family: monospace;
+        font-size: 13px;
+    }
+    .checkbox-group {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .checkbox-group input[type="checkbox"] {
+        width: auto;
+        height: 18px;
+        width: 18px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="import-form">
+    <h1>{% trans "Import Invitations from CSV" %}</h1>
+    
+    <div class="info-box">
+        <strong>📄 CSV Format Instructions:</strong>
+        <p>Your CSV file must include the following columns:</p>
+        <div class="csv-format">
+first_name,last_name,email,phone,rank,institution,address<br>
+John,Doe,john.doe@example.com,+260123456789,Colonel,Zambia Army HQ,Lusaka<br>
+Jane,Smith,jane.smith@example.com,+260987654321,Major,Training Command,Ndola
+        </div>
+        <p style="margin-top: 10px;"><strong>Required:</strong> first_name, last_name<br>
+        <strong>Optional:</strong> email, phone, rank, institution, address</p>
+    </div>
+
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        
+        <div class="form-group">
+            <label for="event">Select Event *</label>
+            <select name="event" id="event" required>
+                <option value="">-- Select an event --</option>
+                {% for event in events %}
+                    <option value="{{ event.id }}">{{ event.name }} - {{ event.date|date:"M d, Y" }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="csv_file">CSV File *</label>
+            <input type="file" name="csv_file" id="csv_file" accept=".csv" required>
+            <small style="color: #666; display: block; margin-top: 5px;">
+                Upload a CSV file with guest information. Maximum file size: 10MB
+            </small>
+        </div>
+        
+        <div class="form-group">
+            <div class="checkbox-group">
+                <input type="checkbox" name="send_emails" id="send_emails">
+                <label for="send_emails" style="margin: 0; font-weight: normal;">
+                    Send invitation emails to guests after import (only to guests with email addresses)
+                </label>
+            </div>
+        </div>
+        
+        <div style="margin-top: 30px; display: flex; gap: 10px;">
+            <button type="submit" class="btn-primary">
+                <i class="fas fa-upload"></i> Import Invitations
+            </button>
+            <a href="{% url 'admin:guests_invitation_changelist' %}" class="btn-secondary">
+                Cancel
+            </a>
+        </div>
+    </form>
+    
+    <div style="margin-top: 30px; padding: 15px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+        <strong>⚠️ Important Notes:</strong>
+        <ul style="margin: 10px 0 0 20px;">
+            <li>If a guest with the same email already exists, they will be reused</li>
+            <li>If an invitation already exists for a guest and event, it will be skipped</li>
+            <li>Barcodes and QR codes will be automatically generated</li>
+            <li>Make sure your CSV file is UTF-8 encoded</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}

@@ -25,6 +25,7 @@ urlpatterns = [
     path('event/<int:event_id>/export/seating/pdf/', export_views.export_seating_chart_pdf, name='export_seating_chart_pdf'),
     path('invitation/<int:invitation_id>/print-card/', export_views.print_invitation_card, name='print_invitation_card'),
     path('event/<int:event_id>/print-all-cards/', export_views.print_event_invitation_cards, name='print_event_invitation_cards'),
+    path('print-blank-barcodes/', export_views.print_blank_barcodes, name='print_blank_barcodes'),
     
     # RSVP URLs
     path('rsvp/<uuid:code>/', views.rsvp_response, name='rsvp'),

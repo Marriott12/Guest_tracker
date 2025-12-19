@@ -585,6 +585,7 @@ class InvitationAdmin(admin.ModelAdmin):
     readonly_fields = ['unique_code', 'sent_at', 'rsvp_link', 'barcode_number', 'barcode_display', 'qr_display', 'check_in_time']
     actions = ['resend_invitations_action']
     list_editable = ['table_number', 'seat_number']
+    change_list_template = 'admin/invitation_changelist.html'
     fieldsets = (
         ('Guest & Event', {
             'fields': ('event', 'guest', 'unique_code')
@@ -660,6 +661,140 @@ class InvitationAdmin(admin.ModelAdmin):
             return format_html('<img src="{}" style="max-width: 150px;" />', obj.qr_code.url)
         return '-'
     qr_display.short_description = 'QR Code'
+    
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path('import-csv/', self.admin_site.admin_view(self.import_csv), name='invitation_import_csv'),
+        ]
+        return custom_urls + urls
+    
+    def import_csv(self, request):
+        """Handle CSV import for invitations"""
+        from django.shortcuts import render, redirect
+        from django.contrib import messages
+        import csv
+        import io
+        
+        if request.method == 'POST':
+            csv_file = request.FILES.get('csv_file')
+            event_id = request.POST.get('event')
+            send_emails = request.POST.get('send_emails') == 'on'
+            
+            if not csv_file:
+                messages.error(request, 'Please select a CSV file to upload.')
+                return redirect('..')
+            
+            if not event_id:
+                messages.error(request, 'Please select an event.')
+                return redirect('..')
+            
+            try:
+                event = Event.objects.get(id=event_id)
+            except Event.DoesNotExist:
+                messages.error(request, 'Selected event does not exist.')
+                return redirect('..')
+            
+            # Validate file extension
+            if not csv_file.name.endswith('.csv'):
+                messages.error(request, 'File must be a CSV file.')
+                return redirect('..')
+            
+            try:
+                # Read CSV file
+                decoded_file = csv_file.read().decode('utf-8')
+                io_string = io.StringIO(decoded_file)
+                reader = csv.DictReader(io_string)
+                
+                created_count = 0
+                updated_count = 0
+                error_count = 0
+                errors = []
+                
+                for row_num, row in enumerate(reader, start=2):  # Start at 2 (accounting for header)
+                    try:
+                        # Extract guest info from CSV
+                        first_name = row.get('first_name', '').strip()
+                        last_name = row.get('last_name', '').strip()
+                        email = row.get('email', '').strip()
+                        phone = row.get('phone', '').strip()
+                        rank = row.get('rank', '').strip()
+                        institution = row.get('institution', '').strip()
+                        address = row.get('address', '').strip()
+                        
+                        if not first_name or not last_name:
+                            errors.append(f"Row {row_num}: Missing first_name or last_name")
+                            error_count += 1
+                            continue
+                        
+                        # Find or create guest
+                        guest = None
+                        if email:
+                            guest = Guest.objects.filter(email=email).first()
+                        
+                        if not guest:
+                            guest = Guest.objects.create(
+                                first_name=first_name,
+                                last_name=last_name,
+                                email=email,
+                                phone=phone,
+                                rank=rank,
+                                institution=institution,
+                                address=address
+                            )
+                        
+                        # Create or get invitation
+                        invitation, created = Invitation.objects.get_or_create(
+                            event=event,
+                            guest=guest
+                        )
+                        
+                        if created:
+                            created_count += 1
+                            # Send email if requested
+                            if send_emails and email:
+                                try:
+                                    from guests.views import send_invitation_email
+                                    send_invitation_email(invitation, request)
+                                    invitation.email_sent = True
+                                    invitation.email_sent_at = timezone.now()
+                                    invitation.save(update_fields=['email_sent', 'email_sent_at'])
+                                except Exception as e:
+                                    logger.error(f"Error sending email to {email}: {e}")
+                        else:
+                            updated_count += 1
+                    
+                    except Exception as e:
+                        errors.append(f"Row {row_num}: {str(e)}")
+                        error_count += 1
+                        logger.error(f"Error processing row {row_num}: {e}")
+                
+                # Show results
+                if created_count > 0:
+                    messages.success(request, f'Successfully created {created_count} invitation(s).')
+                if updated_count > 0:
+                    messages.info(request, f'{updated_count} invitation(s) already existed.')
+                if error_count > 0:
+                    messages.warning(request, f'{error_count} row(s) had errors.')
+                    for error in errors[:10]:  # Show first 10 errors
+                        messages.error(request, error)
+                
+                return redirect('..')
+            
+            except Exception as e:
+                messages.error(request, f'Error processing CSV: {str(e)}')
+                logger.error(f"CSV import error: {e}")
+                return redirect('..')
+        
+        # GET request - show form
+        events = Event.objects.filter(created_by=request.user).order_by('-date')
+        context = {
+            'title': 'Import Invitations from CSV',
+            'events': events,
+            'opts': self.model._meta,
+            'has_view_permission': self.has_view_permission(request),
+        }
+        return render(request, 'admin/invitation_import_csv.html', context)
 
 @admin.register(RSVP)
 class RSVPAdmin(admin.ModelAdmin):
